@@ -25,6 +25,16 @@ public:
         crossover = param ("crossover");
         mix = param ("mix");
         output = param ("output");
+
+        factoryPresets = {
+            { "Default", {} },
+            { "Cymbal Tamer", { { "threshold", -18.0f }, { "crossover", 6000.0f } } },
+            { "De-Harsh Mix", { { "threshold", -15.0f }, { "crossover", 3500.0f }, { "mix", 80.0f } } },
+            { "Vocal De-Ess", { { "threshold", -24.0f }, { "crossover", 5000.0f } } },
+            { "Bright Guitars", { { "threshold", -20.0f }, { "crossover", 2500.0f }, { "mix", 70.0f } } },
+            { "Gentle Polish", { { "threshold", -8.0f }, { "crossover", 10000.0f } } },
+            { "Smooth Master", { { "threshold", -12.0f }, { "crossover", 8000.0f }, { "mix", 60.0f } } },
+        };
     }
 
     static Layout makeLayout()
