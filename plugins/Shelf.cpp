@@ -3,6 +3,7 @@
 // console EQ than to a surgical parametric. Runs at 2x so the top shelf (up to 20 kHz)
 // keeps its shape instead of cramping against Nyquist.
 
+#include "Analyser.h"
 #include "Dsp.h"
 #include "Editor.h"
 
@@ -119,6 +120,8 @@ public:
         oversampling.processSamplesDown (block);
     }
 
+    std::unique_ptr<Display> createDisplay() override;
+
 private:
     void updateCoefficients()
     {
@@ -138,5 +141,82 @@ private:
     double osRate = 88200.0;
     Biquad low, high;
 };
+
+//==============================================================================
+// Response curve of both shelves over a live spectrum of the output, with a marker at
+// each selected shelf frequency.
+class ShelfDisplay final : public Display
+{
+public:
+    using Display::Display;
+
+protected:
+    void onSamples (const float* l, const float* r, int n) override { spectrum.push (l, r, n); }
+    void update() override { spectrum.update(); }
+
+    void drawContent (juce::Graphics& g, juce::Rectangle<float> area) override
+    {
+        constexpr float range = 15.0f;
+        const auto yFor = [&] (float db) { return juce::jmap (db, -range, range, area.getBottom(), area.getY()); };
+
+        g.setFont (draw::mono (10.0f));
+        for (float f : { 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f })
+        {
+            const auto x = freqAxis::toX (f, area);
+            g.setColour (gridColour());
+            g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
+            drawGridLabel (g, f >= 1000.0f ? juce::String ((int) f / 1000) + "k" : juce::String ((int) f),
+                           { x + 2.0f, area.getBottom() - 11.0f, 30.0f, 11.0f });
+        }
+        for (int db = -12; db <= 12; db += 6)
+        {
+            g.setColour (db == 0 ? accent.withAlpha (0.22f) : gridColour());
+            g.drawHorizontalLine ((int) yFor ((float) db), area.getX(), area.getRight());
+            if (db != 0)
+                drawGridLabel (g, (db > 0 ? "+" : "") + juce::String (db), { area.getX() + 2.0f, yFor ((float) db) - 11.0f, 30.0f, 11.0f });
+        }
+
+        const auto sampleRate = proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 48000.0;
+        g.setColour (accent.withAlpha (0.12f));
+        g.fillPath (spectrum.path (area, sampleRate, -84.0f, -6.0f, true));
+        g.setColour (accent.withAlpha (0.3f));
+        g.strokePath (spectrum.path (area, sampleRate, -84.0f, -6.0f, false), juce::PathStrokeType (1.0f));
+
+        // Shelves evaluated at a high rate so the curve shows the oversampled filter, not a cramped one.
+        constexpr double curveRate = 192000.0;
+        const auto lowHz = lowFreqs[(int) paramValue ("lowFreq")];
+        const auto highHz = highFreqs[(int) paramValue ("highFreq")];
+        Biquad low, high;
+        low.lowShelf (curveRate, lowHz, shelfQ, paramValue ("lowGain"));
+        high.highShelf (curveRate, highHz, shelfQ, paramValue ("highGain"));
+
+        juce::Path curve, fill;
+        for (auto x = area.getX(); x <= area.getRight(); x += 1.5f)
+        {
+            const auto f = freqAxis::fromX (x, area);
+            const auto y = yFor (juce::jlimit (-range, range, low.magnitudeDb (f, curveRate) + high.magnitudeDb (f, curveRate)));
+            curve.isEmpty() ? curve.startNewSubPath (x, y) : curve.lineTo (x, y);
+        }
+        fill = curve;
+        fill.lineTo (area.getRight(), yFor (0.0f));
+        fill.lineTo (area.getX(), yFor (0.0f));
+        fill.closeSubPath();
+        g.setColour (accent.withAlpha (0.2f));
+        g.fillPath (fill);
+        draw::glow (g, curve, accent.brighter (0.4f), 2.0f);
+
+        for (auto [f, gainId] : { std::pair { lowHz, "lowGain" }, { highHz, "highGain" } })
+        {
+            const auto x = freqAxis::toX (f, area);
+            const auto y = yFor (juce::jlimit (-range, range, low.magnitudeDb (f, curveRate) + high.magnitudeDb (f, curveRate)));
+            draw::led (g, { x, y }, 4.0f, accent.brighter (0.5f), std::abs (paramValue (gainId)) > 0.05f);
+        }
+    }
+
+private:
+    Spectrum spectrum;
+};
+
+std::unique_ptr<Display> ShelfProcessor::createDisplay() { return std::make_unique<ShelfDisplay> (*this); }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new ShelfProcessor(); }
