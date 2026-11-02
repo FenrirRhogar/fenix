@@ -18,6 +18,14 @@ struct MeterSpec
     juce::String unit;
 };
 
+// A factory preset: parameter values in plain units (choice params use their index).
+// Parameters a preset leaves out go back to their defaults.
+struct Preset
+{
+    juce::String name;
+    std::vector<std::pair<juce::String, float>> values;
+};
+
 // Lock-free single-producer/single-consumer stereo sample queue: the audio thread
 // pushes processed output, the editor drains it for scopes and analysers.
 class ScopeFifo
@@ -153,11 +161,86 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram (int) override {}
-    const juce::String getProgramName (int) override { return {}; }
+    //==============================================================================
+    // Presets: factory presets double as host programs; user presets are state files on disk.
+
+    std::vector<Preset> factoryPresets;
+
+    int getNumPrograms() override { return juce::jmax (1, (int) factoryPresets.size()); }
+    int getCurrentProgram() override { return currentProgram; }
+    void setCurrentProgram (int index) override
+    {
+        if (juce::isPositiveAndBelow (index, (int) factoryPresets.size()))
+            loadFactoryPreset (index);
+    }
+    const juce::String getProgramName (int index) override
+    {
+        return juce::isPositiveAndBelow (index, (int) factoryPresets.size()) ? factoryPresets[(size_t) index].name
+                                                                             : juce::String ("Default");
+    }
     void changeProgramName (int, const juce::String&) override {}
+
+    void loadFactoryPreset (int index)
+    {
+        forEachPresetParameter ([] (juce::RangedAudioParameter& p) { setParameter (p, p.getDefaultValue()); });
+        for (const auto& [id, value] : factoryPresets[(size_t) index].values)
+            if (auto* p = apvts.getParameter (id))
+                setParameter (*p, p->convertTo0to1 (value));
+
+        currentProgram = index;
+        setPresetName (factoryPresets[(size_t) index].name);
+    }
+
+    juce::File userPresetDirectory() const
+    {
+        return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+            .getChildFile ("fenrikos")
+            .getChildFile ("Fenix")
+            .getChildFile (getName());
+    }
+
+    juce::Array<juce::File> userPresets() const
+    {
+        auto files = userPresetDirectory().findChildFiles (juce::File::findFiles, false, "*" + presetExtension);
+        files.sort();
+        return files;
+    }
+
+    bool saveUserPreset (const juce::String& name)
+    {
+        const auto file = userPresetDirectory().getChildFile (juce::File::createLegalFileName (name) + presetExtension);
+        if (! file.getParentDirectory().createDirectory())
+            return false;
+
+        auto xml = apvts.copyState().createXml();
+        if (xml == nullptr || ! xml->writeTo (file))
+            return false;
+
+        setPresetName (name);
+        return true;
+    }
+
+    bool loadUserPreset (const juce::File& file)
+    {
+        const auto xml = juce::XmlDocument::parse (file);
+        if (xml == nullptr || ! xml->hasTagName (apvts.state.getType()))
+            return false;
+
+        // Set values through the parameters (not replaceState) so hosts record the change.
+        const auto tree = juce::ValueTree::fromXml (*xml);
+        forEachPresetParameter ([&tree] (juce::RangedAudioParameter& p) {
+            const auto child = tree.getChildWithProperty ("id", p.getParameterID());
+            if (child.isValid())
+                setParameter (p, p.convertTo0to1 ((float) child.getProperty ("value")));
+        });
+
+        setPresetName (file.getFileNameWithoutExtension());
+        return true;
+    }
+
+    juce::String presetName() const { return apvts.state.getProperty ("presetName", "Default"); }
+
+    inline static const juce::String presetExtension { ".fenixpreset" };
 
     void getStateInformation (juce::MemoryBlock& dest) override
     {
@@ -173,6 +256,23 @@ public:
     }
 
 private:
+    template <typename Fn>
+    void forEachPresetParameter (Fn&& fn)
+    {
+        for (auto* raw : getParameters())
+            if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (raw); p != nullptr && p->getParameterID() != "bypass")
+                fn (*p);
+    }
+
+    static void setParameter (juce::RangedAudioParameter& p, float normalised)
+    {
+        p.beginChangeGesture();
+        p.setValueNotifyingHost (normalised);
+        p.endChangeGesture();
+    }
+
+    void setPresetName (const juce::String& name) { apvts.state.setProperty ("presetName", name, nullptr); }
+
     static float blockLevel (const juce::AudioBuffer<float>& buffer, int numChannels, bool peak)
     {
         float level = 0.0f;
@@ -189,6 +289,7 @@ private:
     }
 
     std::atomic<float>* bypass = nullptr;
+    int currentProgram = 0;
     juce::AudioBuffer<float> dryBuffer;
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay { 4096 };
     juce::SmoothedValue<float> bypassMix;
