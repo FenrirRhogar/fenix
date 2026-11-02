@@ -43,6 +43,7 @@ fenix_plugin(Shelf     "Shelf EQ"  FxSh)  # broad two-band shelving EQ
 fenix_plugin(HFComp    "HF Comp"   FxHc)  # high-band-only compressor
 fenix_plugin(Width     "Width"     FxWd)  # M/S width + low-band spread
 fenix_plugin(Iron      "Iron"      FxIr)  # output transformer colour
+fenix_plugin(Bus       "Bus"       FxBs)  # all five stages in one chain
 
 # Optional: one <Plugin>_snapshot executable per plugin that renders its editor to PNG.
 option(FENIX_SNAPSHOTS "Build editor snapshot tools" OFF)

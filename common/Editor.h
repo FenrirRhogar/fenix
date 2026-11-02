@@ -59,9 +59,9 @@ protected:
         startTimerHz (60);
     }
 
-    Knob& addKnob (juce::RangedAudioParameter& param, juce::Colour accent)
+    Knob& addKnob (juce::RangedAudioParameter& param, juce::Colour accent, const juce::String& label = {})
     {
-        auto& knob = *knobs.emplace_back (std::make_unique<Knob> (param, accent));
+        auto& knob = *knobs.emplace_back (std::make_unique<Knob> (param, accent, label));
         attachments.push_back (std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.apvts, param.getParameterID(), knob));
         knob.setDoubleClickReturnValue (true, param.convertFrom0to1 (param.getDefaultValue()));
         knob.setPopupMenuEnabled (false);
