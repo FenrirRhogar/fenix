@@ -1,5 +1,6 @@
 #pragma once
 
+#include "PresetBar.h"
 #include "Widgets.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -14,7 +15,7 @@ class Editor : public juce::AudioProcessorEditor, private juce::Timer
 public:
     static constexpr int width = 860, height = 500;
 
-    explicit Editor (Processor& p) : AudioProcessorEditor (p), proc (p), power (p.accent())
+    explicit Editor (Processor& p) : AudioProcessorEditor (p), proc (p), power (p.accent()), presetBar (p)
     {
         lnf.setAccent (p.accent());
         setLookAndFeel (&lnf);
@@ -46,13 +47,7 @@ public:
         addAndMakeVisible (*leftMeter);
         addAndMakeVisible (*rightMeter);
 
-        presets.onChange = [this] { presetChosen (presets.getSelectedId()); };
-        previous.onClick = [this] { stepPreset (-1); };
-        next.onClick = [this] { stepPreset (1); };
-        save.onClick = [this] { askForPresetName(); };
-        for (auto* c : std::initializer_list<juce::Component*> { &presets, &previous, &next, &save })
-            addAndMakeVisible (c);
-        refreshPresetList();
+        addAndMakeVisible (presetBar);
 
         texture = draw::brushedTexture (width, height);
         setSize (width, height);
@@ -113,12 +108,7 @@ public:
     void resized() override
     {
         power.setBounds (getWidth() - 62, 14, 32, 32);
-        auto bar = juce::Rectangle<int> (getWidth() - 470, 18, 390, 26);
-        save.setBounds (bar.removeFromRight (58));
-        bar.removeFromRight (8);
-        next.setBounds (bar.removeFromRight (28));
-        previous.setBounds (bar.removeFromLeft (28));
-        presets.setBounds (bar.reduced (4, 0));
+        presetBar.setBounds (getWidth() - 470, 18, 390, 26);
 
         const int meterWidth = 176, top = 80, mainHeight = 200;
         leftMeter->setBounds (20, top, meterWidth, mainHeight);
@@ -150,67 +140,7 @@ private:
         rightMeter->repaint();
         display->repaint();
 
-        if (proc.presetName() != presets.getText())
-            refreshPresetList();
-    }
-
-    // Factory presets use ids 1..n, user presets 1000 and up.
-    void refreshPresetList()
-    {
-        presets.clear (juce::dontSendNotification);
-        for (size_t i = 0; i < proc.factoryPresets.size(); ++i)
-            presets.addItem (proc.factoryPresets[i].name, (int) i + 1);
-
-        userFiles = proc.userPresets();
-        if (! userFiles.isEmpty())
-        {
-            presets.addSectionHeading ("User");
-            for (int i = 0; i < userFiles.size(); ++i)
-                presets.addItem (userFiles[i].getFileNameWithoutExtension(), 1000 + i);
-        }
-
-        presets.setText (proc.presetName(), juce::dontSendNotification);
-    }
-
-    void presetChosen (int id)
-    {
-        if (id >= 1000)
-            proc.loadUserPreset (userFiles[id - 1000]);
-        else if (id >= 1)
-            proc.loadFactoryPreset (id - 1);
-        presets.setText (proc.presetName(), juce::dontSendNotification);
-    }
-
-    void stepPreset (int delta)
-    {
-        juce::Array<int> ids;
-        for (int i = 0; i < presets.getNumItems(); ++i)
-            ids.add (presets.getItemId (i));
-        if (ids.isEmpty())
-            return;
-
-        const auto current = ids.indexOf (presets.getSelectedId());
-        const auto target = current < 0 ? (delta > 0 ? 0 : ids.size() - 1) : (current + delta + ids.size()) % ids.size();
-        presetChosen (ids[target]);
-    }
-
-    void askForPresetName()
-    {
-        dialog = std::make_unique<juce::AlertWindow> ("Save preset", "Name for this preset:", juce::MessageBoxIconType::NoIcon, this);
-        dialog->setLookAndFeel (&lnf);
-        dialog->addTextEditor ("name", proc.presetName());
-        dialog->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
-        dialog->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
-        dialog->enterModalState (true, juce::ModalCallbackFunction::create ([this] (int result) {
-            const auto name = dialog->getTextEditorContents ("name").trim();
-            if (result == 1 && name.isNotEmpty())
-                proc.saveUserPreset (name);
-            refreshPresetList();
-            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<Editor> (this)] {
-                if (safe != nullptr)
-                    safe->dialog.reset();
-            });
-        }));
+        presetBar.refresh();
     }
 
     Processor& proc;
@@ -227,10 +157,7 @@ private:
     std::unique_ptr<VuMeter> leftMeter, rightMeter;
     juce::Rectangle<int> knobPanel;
 
-    juce::ComboBox presets;
-    juce::TextButton previous { "<" }, next { ">" }, save { "SAVE" };
-    juce::Array<juce::File> userFiles;
-    std::unique_ptr<juce::AlertWindow> dialog;
+    PresetBar presetBar;
 };
 
 inline juce::AudioProcessorEditor* Processor::createEditor() { return new Editor (*this); }
