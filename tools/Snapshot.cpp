@@ -24,7 +24,7 @@ namespace
                 lastNoise = noise;
                 const auto padL = 0.08 * std::sin (juce::MathConstants<double>::twoPi * 330.0 * t) + 0.06 * std::sin (juce::MathConstants<double>::twoPi * 495.3 * t);
                 const auto padR = 0.08 * std::sin (juce::MathConstants<double>::twoPi * 331.1 * t + 1.0) + 0.06 * std::sin (juce::MathConstants<double>::twoPi * 494.1 * t);
-                const auto mono = 0.45 * kick + bass + 0.12 * hatEnv * hat;
+                const auto mono = 0.45 * kick + bass + 0.4 * hatEnv * hat;
                 constexpr double level = 0.3; // around -18 dBFS RMS, 0 VU
                 buffer.setSample (0, n, (float) (level * (mono + padL)));
                 buffer.setSample (1, n, (float) (level * (mono + padR)));
