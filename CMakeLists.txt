@@ -33,3 +33,5 @@ function(fenix_plugin target name code)
                juce::juce_recommended_lto_flags
                juce::juce_recommended_warning_flags)
 endfunction()
+
+fenix_plugin(Drive     "Drive"     FxDr)  # harmonic saturation
