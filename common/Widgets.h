@@ -347,10 +347,14 @@ private:
 class Display : public juce::Component
 {
 public:
-    explicit Display (Processor& p) : proc (p), accent (p.accent())
+    // `paramPrefix` is prepended to parameter ids, so a module's view can sit inside a larger plugin.
+    Display (Processor& p, juce::Colour accentColour, juce::String paramPrefix = {})
+        : proc (p), accent (accentColour), prefix (std::move (paramPrefix))
     {
         setInterceptsMouseClicks (false, false);
     }
+
+    explicit Display (Processor& p) : Display (p, p.accent()) {}
 
     void tick()
     {
@@ -388,7 +392,7 @@ protected:
     virtual void update() {}
     virtual void drawContent (juce::Graphics&, juce::Rectangle<float> area) = 0;
 
-    float paramValue (const char* id) const { return proc.apvts.getRawParameterValue (id)->load(); }
+    float paramValue (const char* id) const { return proc.apvts.getRawParameterValue (prefix + id)->load(); }
 
     void drawGridLabel (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area,
                         juce::Justification just = juce::Justification::centredLeft) const
@@ -404,6 +408,7 @@ protected:
     juce::Colour accent;
 
 private:
+    juce::String prefix;
     std::array<float, ScopeFifo::capacity> left {}, right {};
 };
 
