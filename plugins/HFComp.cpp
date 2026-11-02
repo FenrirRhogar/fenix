@@ -3,6 +3,7 @@
 // Linkwitz-Riley 4th-order split (sums flat when idle), stereo-linked peak detector,
 // fast attack / short release, 4:1 with a 6 dB soft knee.
 
+#include "Analyser.h"
 #include "Dsp.h"
 #include "Editor.h"
 
@@ -113,6 +114,8 @@ public:
         meter.store (maxReduction);
     }
 
+    std::unique_ptr<Display> createDisplay() override;
+
 private:
     // Soft-knee static curve: dB above threshold -> gain change in dB (<= 0).
     static float gainComputer (float overDb)
@@ -135,5 +138,91 @@ private:
     juce::SmoothedValue<float> mixAmt, outGain;
     float attackCoef = 0.0f, releaseCoef = 0.0f, envelopeDb = 0.0f;
 };
+
+//==============================================================================
+// Live spectrum with the compressed band shaded above the crossover (brighter as it works
+// harder), and a scrolling trace of gain reduction hanging from the top edge.
+class HFCompDisplay final : public Display
+{
+public:
+    using Display::Display;
+
+protected:
+    void onSamples (const float* l, const float* r, int n) override { spectrum.push (l, r, n); }
+
+    void update() override
+    {
+        spectrum.update();
+        history[(size_t) writePos] = proc.meter.load();
+        writePos = (writePos + 1) % (int) history.size();
+    }
+
+    void drawContent (juce::Graphics& g, juce::Rectangle<float> area) override
+    {
+        for (float f : { 100.0f, 1000.0f, 10000.0f })
+        {
+            const auto x = freqAxis::toX (f, area);
+            g.setColour (gridColour());
+            g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
+            drawGridLabel (g, f >= 1000.0f ? juce::String ((int) f / 1000) + "k" : juce::String ((int) f),
+                           { x + 2.0f, area.getBottom() - 11.0f, 30.0f, 11.0f });
+        }
+
+        const auto sampleRate = proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 48000.0;
+        const auto reduction = history[(size_t) ((writePos - 1 + (int) history.size()) % (int) history.size())];
+        const auto xover = freqAxis::toX (paramValue ("crossover"), area);
+        const auto band = area.withLeft (xover);
+
+        g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.05f + 0.035f * juce::jmin (reduction, 8.0f)), band.getX(), 0.0f,
+                                                 accent.withAlpha (0.02f), band.getRight(), 0.0f, false));
+        g.fillRect (band);
+
+        g.setColour (accent.withAlpha (0.1f));
+        g.fillPath (spectrum.path (area, sampleRate, -84.0f, -6.0f, true));
+        {
+            const juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (band.toNearestInt());
+            g.setColour (accent.withAlpha (0.3f));
+            g.fillPath (spectrum.path (area, sampleRate, -84.0f, -6.0f, true));
+        }
+        g.setColour (accent.withAlpha (0.45f));
+        g.strokePath (spectrum.path (area, sampleRate, -84.0f, -6.0f, false), juce::PathStrokeType (1.0f));
+
+        juce::Path line;
+        line.startNewSubPath (xover, area.getY());
+        line.lineTo (xover, area.getBottom());
+        draw::glow (g, line, accent.brighter (0.3f), 1.5f);
+        drawGridLabel (g, "XOVER " + juce::String (paramValue ("crossover") / 1000.0f, 1) + "k",
+                       { xover + 5.0f, area.getY() + 30.0f, 90.0f, 11.0f });
+
+        // Gain-reduction history: 0 dB at the top edge, 12 dB a third of the way down.
+        const auto grArea = area.withHeight (area.getHeight() * 0.33f);
+        juce::Path gr;
+        const auto count = (int) history.size();
+        for (int i = 0; i < count; ++i)
+        {
+            const auto value = history[(size_t) ((writePos + i) % count)];
+            const auto x = juce::jmap ((float) i, 0.0f, (float) (count - 1), area.getX(), area.getRight());
+            const auto y = grArea.getY() + juce::jmin (value, 12.0f) / 12.0f * grArea.getHeight();
+            i == 0 ? gr.startNewSubPath (x, y) : gr.lineTo (x, y);
+        }
+        auto grFill = gr;
+        grFill.lineTo (area.getRight(), grArea.getY());
+        grFill.lineTo (area.getX(), grArea.getY());
+        grFill.closeSubPath();
+        g.setColour (accent.withAlpha (0.18f));
+        g.fillPath (grFill);
+        draw::glow (g, gr, accent.brighter (0.5f), 1.6f);
+
+        drawGridLabel (g, "GR " + juce::String (reduction, 1) + " dB", { xover + 5.0f, area.getY() + 44.0f, 90.0f, 11.0f });
+    }
+
+private:
+    Spectrum spectrum;
+    std::array<float, 240> history {};
+    int writePos = 0;
+};
+
+std::unique_ptr<Display> HFCompProcessor::createDisplay() { return std::make_unique<HFCompDisplay> (*this); }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new HFCompProcessor(); }
