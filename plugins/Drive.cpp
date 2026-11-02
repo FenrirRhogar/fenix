@@ -8,6 +8,30 @@
 
 using namespace fenix;
 
+// The static saturation curve for a given drive gain and density (0..1), level-compensated
+// so a -12 dBFS sine leaves at the same level it came in.
+struct DriveCurve
+{
+    DriveCurve (float driveGain, float density)
+        : gain (driveGain), knee (1.6f + 4.4f * density), bias (0.3f * density), offset (shape (bias, knee))
+    {
+        constexpr float ref = 0.25f;
+        const float refOut = 0.5f * (shape (gain * ref + bias, knee) - shape (-gain * ref + bias, knee));
+        makeup = ref / juce::jmax (refOut, 1.0e-6f);
+    }
+
+    float operator() (float x) const { return (shape (gain * x + bias, knee) - offset) * makeup; }
+
+    // Algebraic sigmoid x / (1 + |x|^k)^(1/k): k sets how abruptly it bends toward +-1.
+    // Density raises k (harder knee) and the bias (even harmonics).
+    static float shape (float x, float k)
+    {
+        return x / std::pow (1.0f + std::pow (std::abs (x), k), 1.0f / k);
+    }
+
+    float gain, knee, bias, offset, makeup = 1.0f;
+};
+
 class DriveProcessor final : public Processor
 {
 public:
@@ -80,21 +104,13 @@ public:
             const float wet = mixAmt.getNextValue();
             const float out = outGain.getNextValue();
 
-            const float knee = 1.6f + 4.4f * d; // 1.6 = very soft, 6 = close to hard clip
-            const float bias = 0.3f * d;
-            const float offset = shape (bias, knee);
-
-            // Gain at which a -12 dBFS sine leaves at the same level, averaged over both halves.
-            constexpr float ref = 0.25f;
-            const float refOut = 0.5f * (shape (g * ref + bias, knee) - shape (-g * ref + bias, knee));
-            const float makeup = ref / juce::jmax (refOut, 1.0e-6f);
+            const DriveCurve curve (g, d);
 
             for (int ch = 0; ch < numChannels; ++ch)
             {
                 auto* x = up.getChannelPointer ((size_t) ch);
                 const float dry = x[n];
-                const float sat = (shape (g * dry + bias, knee) - offset) * makeup;
-                x[n] = (dry + wet * (sat - dry)) * out;
+                x[n] = (dry + wet * (curve (dry) - dry)) * out;
             }
         }
 
@@ -108,13 +124,9 @@ public:
         }
     }
 
-private:
-    // Algebraic sigmoid x / (1 + |x|^k)^(1/k): k sets how abruptly it bends toward +-1.
-    static float shape (float x, float k)
-    {
-        return x / std::pow (1.0f + std::pow (std::abs (x), k), 1.0f / k);
-    }
+    std::unique_ptr<Display> createDisplay() override;
 
+private:
     std::atomic<float>* drive = nullptr;
     std::atomic<float>* density = nullptr;
     std::atomic<float>* mix = nullptr;
@@ -124,5 +136,79 @@ private:
     juce::dsp::Oversampling<float> oversampling { 2, 2, juce::dsp::Oversampling<float>::filterHalfBandFIREquiripple, true, true };
     DcBlocker dc;
 };
+
+//==============================================================================
+// Transfer curve (input level -> output level) against the straight unity line. The shaded gap
+// between them is the saturation; glowing dots ride the curve at the current input peak.
+class DriveDisplay final : public Display
+{
+public:
+    using Display::Display;
+
+protected:
+    void update() override
+    {
+        const auto peak = proc.inputPeak.load();
+        level = peak > level ? peak : level * 0.9f;
+    }
+
+    void drawContent (juce::Graphics& g, juce::Rectangle<float> area) override
+    {
+        const auto plot = area.withSizeKeepingCentre (juce::jmin (area.getWidth(), area.getHeight() * 1.9f), area.getHeight());
+        const auto toPoint = [&plot] (float x, float y) {
+            return juce::Point<float> (juce::jmap (x, -1.0f, 1.0f, plot.getX(), plot.getRight()),
+                                       juce::jmap (juce::jlimit (-1.15f, 1.15f, y), -1.15f, 1.15f, plot.getBottom(), plot.getY()));
+        };
+
+        g.setColour (gridColour());
+        for (int i = -1; i <= 1; ++i)
+        {
+            const auto v = 0.5f * (float) i;
+            const auto thickness = i == 0 ? 1.2f : 0.8f;
+            g.drawLine ({ toPoint (v, -1.15f), toPoint (v, 1.15f) }, thickness);
+            g.drawLine ({ toPoint (-1.0f, v), toPoint (1.0f, v) }, thickness);
+        }
+
+        const DriveCurve curve (juce::Decibels::decibelsToGain (paramValue ("drive")), paramValue ("density") / 100.0f);
+        const auto mix = paramValue ("mix") / 100.0f;
+        const auto transfer = [&] (float x) { return x + mix * (curve (x) - x); };
+
+        juce::Path line, gap;
+        for (int i = 0; i <= 160; ++i)
+        {
+            const auto x = -1.0f + 2.0f * (float) i / 160.0f;
+            const auto p = toPoint (x, transfer (x));
+            i == 0 ? line.startNewSubPath (p) : line.lineTo (p);
+        }
+        gap = line;
+        gap.lineTo (toPoint (1.0f, 1.0f));
+        gap.lineTo (toPoint (-1.0f, -1.0f));
+        gap.closeSubPath();
+
+        g.setColour (accent.withAlpha (0.16f));
+        g.fillPath (gap);
+        const float dashes[] { 4.0f, 4.0f };
+        juce::Path unity, dashed;
+        unity.startNewSubPath (toPoint (-1.0f, -1.0f));
+        unity.lineTo (toPoint (1.0f, 1.0f));
+        juce::PathStrokeType (1.0f).createDashedStroke (dashed, unity, dashes, 2);
+        g.setColour (accent.withAlpha (0.35f));
+        g.fillPath (dashed);
+        draw::glow (g, line, accent.brighter (0.35f), 2.0f);
+
+        const auto x = juce::jmin (level, 1.0f);
+        for (auto sign : { -1.0f, 1.0f })
+            draw::led (g, toPoint (sign * x, transfer (sign * x)), 4.0f, accent.brighter (0.6f), level > 0.001f);
+
+        drawGridLabel (g, "TRANSFER", area.removeFromTop (12.0f));
+        drawGridLabel (g, "IN " + juce::String (juce::Decibels::gainToDecibels (level, -60.0f), 1) + " dBFS", area.removeFromBottom (12.0f),
+                       juce::Justification::centredRight);
+    }
+
+private:
+    float level = 0.0f;
+};
+
+std::unique_ptr<Display> DriveProcessor::createDisplay() { return std::make_unique<DriveDisplay> (*this); }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new DriveProcessor(); }
