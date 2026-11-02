@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <complex>
 
 namespace fenix
 {
@@ -58,6 +59,16 @@ struct Biquad
         z1[ch] = b1 * x - a1 * y + z2[ch];
         z2[ch] = b2 * x - a2 * y;
         return y;
+    }
+
+    // Magnitude response in dB at `f`, for drawing EQ curves.
+    float magnitudeDb (double f, double fs) const
+    {
+        const auto z1inv = std::polar (1.0, -2.0 * M_PI * f / fs);
+        const auto z2inv = z1inv * z1inv;
+        const auto h = ((double) b0 + (double) b1 * z1inv + (double) b2 * z2inv)
+                     / (1.0 + (double) a1 * z1inv + (double) a2 * z2inv);
+        return (float) (20.0 * std::log10 (std::abs (h) + 1.0e-12));
     }
 
 private:
