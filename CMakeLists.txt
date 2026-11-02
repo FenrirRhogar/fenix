@@ -38,3 +38,4 @@ fenix_plugin(Drive     "Drive"     FxDr)  # harmonic saturation
 fenix_plugin(Shelf     "Shelf EQ"  FxSh)  # broad two-band shelving EQ
 fenix_plugin(HFComp    "HF Comp"   FxHc)  # high-band-only compressor
 fenix_plugin(Width     "Width"     FxWd)  # M/S width + low-band spread
+fenix_plugin(Iron      "Iron"      FxIr)  # output transformer colour
