@@ -30,13 +30,13 @@ namespace detail
 }
 
 //==============================================================================
-// Hardware-style rotary: knurled metal skirt, coloured cap, lit tick ring and a value LCD.
-// Choice parameters become stepped switches with a label at every position.
+// Rotary: dark dished knob with a glowing value arc and an accent indicator.
+// Choice parameters become stepped switches with a lit dot and a label at every position.
 class Knob : public juce::Slider
 {
 public:
-    Knob (juce::RangedAudioParameter& p, juce::Colour accentColour)
-        : name (p.getName (24).toUpperCase()), accent (accentColour)
+    Knob (juce::RangedAudioParameter& p, juce::Colour accentColour, const juce::String& label = {})
+        : name ((label.isEmpty() ? p.getName (24) : label).toUpperCase()), accent (accentColour)
     {
         setSliderStyle (RotaryHorizontalVerticalDrag);
         setTextBoxStyle (NoTextBox, false, 0, 0);
@@ -59,118 +59,90 @@ public:
     void paint (juce::Graphics& g) override
     {
         auto bounds = getLocalBounds().toFloat();
-        const auto lcdArea = bounds.removeFromBottom (18.0f).withSizeKeepingCentre (juce::jmin (bounds.getWidth() - 10.0f, 86.0f), 18.0f);
-        const auto nameArea = bounds.removeFromBottom (20.0f);
+        const auto valueArea = bounds.removeFromBottom (16.0f);
+        const auto nameArea = bounds.removeFromBottom (18.0f);
 
         const bool stepped = ! stepLabels.isEmpty();
         const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight());
         const auto centre = bounds.getCentre();
-        const auto r = size * 0.5f - (stepped ? 22.0f : 16.0f);
+        const auto ringR = size * 0.5f - (stepped ? 18.0f : 8.0f);
+        const auto r = ringR - 7.0f;
         const auto params = getRotaryParameters();
         const auto pos = (float) valueToProportionOfLength (getValue());
         const auto angleAt = [&] (float t) { return params.startAngleRadians + t * (params.endAngleRadians - params.startAngleRadians); };
         const bool active = isMouseOverOrDragging();
+        const auto stroke = juce::PathStrokeType (3.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
 
-        // Tick ring: lit from the rest position (or centre, for +/- scales) to the current value.
-        const int ticks = stepped ? stepLabels.size() - 1 : 30;
-        const auto origin = bipolar ? 0.5f : 0.0f;
-        for (int i = 0; i <= ticks; ++i)
-        {
-            const auto t = (float) i / (float) ticks;
-            const bool lit = stepped ? std::abs (t - pos) < 0.5f / (float) ticks
-                                     : (t >= juce::jmin (origin, pos) - 1.0e-4f && t <= juce::jmax (origin, pos) + 1.0e-4f);
-            const bool major = stepped || i % 5 == 0;
-            const auto a = angleAt (t);
-            const juce::Line<float> tick (detail::polar (centre, r + 5.0f, a), detail::polar (centre, r + (major ? 11.0f : 8.0f), a));
-            if (lit)
-            {
-                g.setColour (accent.withAlpha (0.25f));
-                g.drawLine (tick, 6.0f);
-            }
-            g.setColour (lit ? accent.brighter (0.25f) : colours::tickOff);
-            g.drawLine (tick, major ? 2.2f : 1.6f);
-        }
+        juce::Path track;
+        track.addCentredArc (centre.x, centre.y, ringR, ringR, 0.0f, params.startAngleRadians, params.endAngleRadians, true);
+        g.setColour (colours::tickOff);
+        g.strokePath (track, stroke);
 
-        g.setFont (draw::font (10.0f, true));
         if (stepped)
         {
-            for (int i = 0; i <= ticks; ++i)
+            const int steps = stepLabels.size() - 1;
+            g.setFont (draw::font (10.0f, true));
+            for (int i = 0; i <= steps; ++i)
             {
-                const auto t = (float) i / (float) ticks;
-                const auto p = detail::polar (centre, r + 19.0f, angleAt (t));
-                const bool selected = std::abs (t - pos) < 0.5f / (float) ticks;
+                const auto t = (float) i / (float) steps;
+                const bool selected = std::abs (t - pos) < 0.5f / (float) steps;
+                const auto dot = detail::polar (centre, ringR, angleAt (t));
+                if (selected)
+                {
+                    draw::led (g, dot, 3.2f, accent, true);
+                }
+                else
+                {
+                    g.setColour (colours::engraveDim.withAlpha (0.55f));
+                    g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (dot));
+                }
                 g.setColour (selected ? accent.brighter (0.4f) : colours::engraveDim);
-                g.drawText (stepLabels[i], juce::Rectangle<float> (34.0f, 12.0f).withCentre (p), juce::Justification::centred);
+                g.drawText (stepLabels[i], juce::Rectangle<float> (34.0f, 12.0f).withCentre (detail::polar (centre, ringR + 13.0f, angleAt (t))),
+                            juce::Justification::centred);
             }
         }
         else
         {
+            const auto origin = bipolar ? 0.5f : 0.0f;
+            juce::Path value;
+            value.addCentredArc (centre.x, centre.y, ringR, ringR, 0.0f, angleAt (juce::jmin (origin, pos)), angleAt (juce::jmax (origin, pos)), true);
+            draw::glow (g, value, active ? accent.brighter (0.25f) : accent, 3.5f);
+
+            g.setFont (draw::font (10.0f));
+            g.setColour (colours::engraveDim);
             for (int end = 0; end < 2; ++end)
             {
-                const auto p = detail::polar (centre, r + 13.0f, angleAt ((float) end)).translated (end == 0 ? -6.0f : 6.0f, 10.0f);
-                draw::engraved (g, endLabels[end], juce::Rectangle<float> (34.0f, 12.0f).withCentre (p),
-                                juce::Justification::centred, colours::engraveDim);
+                const auto p = detail::polar (centre, ringR, angleAt ((float) end)).translated (end == 0 ? -4.0f : 4.0f, 13.0f);
+                g.drawText (endLabels[end], juce::Rectangle<float> (34.0f, 12.0f).withCentre (p), juce::Justification::centred);
             }
         }
 
-        // Body: drop shadow, metal skirt with knurling, coloured cap with highlight.
+        // Body: soft shadow, convex rim and a slightly dished face.
         const auto body = juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (centre);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.fillEllipse (body.translated (0.0f, 4.0f).expanded (2.0f));
-        g.setColour (juce::Colours::black.withAlpha (0.25f));
-        g.fillEllipse (body.translated (0.0f, 8.0f).expanded (4.0f));
-
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff5a5e66), centre.translated (-r * 0.5f, -r * 0.7f),
-                                                 juce::Colour (0xff121316), centre.translated (r * 0.4f, r * 0.8f), false));
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillEllipse (body.translated (0.0f, 3.0f).expanded (1.5f));
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff40444d), body.getCentreX(), body.getY(),
+                                                 juce::Colour (0xff1a1c21), body.getCentreX(), body.getBottom(), false));
         g.fillEllipse (body);
-        for (int i = 0; i < 64; ++i)
-        {
-            const auto a = (float) i * juce::MathConstants<float>::twoPi / 64.0f;
-            g.setColour (i % 2 == 0 ? juce::Colours::white.withAlpha (0.08f) : juce::Colours::black.withAlpha (0.35f));
-            g.drawLine ({ detail::polar (centre, r * 0.83f, a), detail::polar (centre, r * 0.98f, a) }, 1.3f);
-        }
-        g.setColour (juce::Colours::black.withAlpha (0.7f));
-        g.drawEllipse (body, 1.0f);
+        const auto face = body.reduced (r * 0.14f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff23262c), face.getCentreX(), face.getY(),
+                                                 juce::Colour (0xff30343b), face.getCentreX(), face.getBottom(), false));
+        g.fillEllipse (face);
+        g.setColour (juce::Colours::white.withAlpha (active ? 0.12f : 0.06f));
+        g.drawEllipse (body.reduced (0.5f), 1.0f);
 
-        const auto capR = r * 0.74f;
-        const auto cap = juce::Rectangle<float> (capR * 2.0f, capR * 2.0f).withCentre (centre);
-        const auto capColour = active ? accent.brighter (0.15f) : accent;
-        g.setGradientFill (juce::ColourGradient (capColour.brighter (0.45f), centre.translated (-capR * 0.45f, -capR * 0.55f),
-                                                 capColour.darker (0.9f), centre.translated (capR * 0.7f, capR * 0.9f), true));
-        g.fillEllipse (cap);
-        g.setColour (juce::Colours::black.withAlpha (0.55f));
-        g.drawEllipse (cap, 1.2f);
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.3f), cap.getCentreX(), cap.getY(),
-                                                 juce::Colours::white.withAlpha (0.0f), cap.getCentreX(), cap.getCentreY(), false));
-        g.fillEllipse (cap.reduced (capR * 0.18f, capR * 0.08f).withTrimmedBottom (capR * 0.9f));
+        const auto a = angleAt (pos);
+        juce::Path indicator;
+        indicator.startNewSubPath (detail::polar (centre, r * 0.3f, a));
+        indicator.lineTo (detail::polar (centre, r * 0.78f, a));
+        draw::glow (g, indicator, accent.brighter (0.3f), 3.0f);
 
-        // Pointer line, running from the cap's centre region out across the skirt.
-        juce::Path pointer;
-        pointer.addRoundedRectangle (-1.7f, -r * 0.97f, 3.4f, r * 0.55f, 1.7f);
-        const auto rotation = juce::AffineTransform::rotation (angleAt (pos)).translated (centre);
-        g.setColour (juce::Colours::black.withAlpha (0.4f));
-        g.fillPath (pointer, rotation.translated (0.0f, 1.0f));
-        g.setColour (juce::Colours::white.withAlpha (0.95f));
-        g.fillPath (pointer, rotation);
-
-        if (active)
-        {
-            g.setColour (accent.withAlpha (0.35f));
-            g.drawEllipse (body.expanded (2.5f), 1.2f);
-        }
-
-        g.setFont (draw::font (11.5f, true));
-        draw::engraved (g, name, nameArea, juce::Justification::centred);
-
-        g.setColour (colours::lcd);
-        g.fillRoundedRectangle (lcdArea, 3.0f);
-        g.setColour (juce::Colours::black);
-        g.drawRoundedRectangle (lcdArea, 3.0f, 1.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.05f));
-        g.drawHorizontalLine ((int) lcdArea.getBottom(), lcdArea.getX() + 2.0f, lcdArea.getRight() - 2.0f);
-        g.setFont (draw::mono (12.0f));
-        g.setColour (accent.brighter (active ? 0.6f : 0.3f));
-        g.drawText (getTextFromValue (getValue()), lcdArea, juce::Justification::centred);
+        g.setFont (juce::FontOptions (10.5f, juce::Font::bold).withKerningFactor (0.1f));
+        g.setColour (colours::engraveDim);
+        g.drawText (name, nameArea, juce::Justification::centred);
+        g.setFont (draw::font (12.5f));
+        g.setColour (active ? accent.brighter (0.5f) : colours::engrave);
+        g.drawText (getTextFromValue (getValue()), valueArea, juce::Justification::centred);
     }
 
 private:
@@ -182,47 +154,57 @@ private:
 };
 
 //==============================================================================
-// Round metal push button with an LED: lit while the processor is engaged.
-// Attached to the "bypass" parameter, so the LED shows the inverse of the toggle state.
+// Pill switch with a glowing track when engaged. By default it is attached to "bypass",
+// so it lights while the toggle is off; pass litWhenOn for ordinary on/off parameters.
 class PowerButton : public juce::ToggleButton
 {
 public:
-    explicit PowerButton (juce::Colour accentColour) : accent (accentColour)
+    explicit PowerButton (juce::Colour accentColour, bool litWhenToggleOn = false)
+        : accent (accentColour), litWhenOn (litWhenToggleOn)
     {
         setTooltip ("Engage / bypass");
     }
 
-    void paintButton (juce::Graphics& g, bool over, bool down) override
+    void paintButton (juce::Graphics& g, bool over, bool) override
     {
-        const auto b = getLocalBounds().toFloat().reduced (2.0f);
-        const auto c = b.getCentre();
-        const auto r = juce::jmin (b.getWidth(), b.getHeight()) * 0.5f;
-        const auto body = juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c);
+        const auto area = getLocalBounds().toFloat().reduced (2.0f);
+        const auto track = area.withSizeKeepingCentre (area.getWidth(), juce::jmin (area.getHeight(), area.getWidth() * 0.55f));
+        const auto radius = track.getHeight() * 0.5f;
+        const bool lit = litWhenOn == getToggleState();
 
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.fillEllipse (body.translated (0.0f, 2.0f));
-        g.setGradientFill (juce::ColourGradient (juce::Colour (down ? 0xff2a2c31 : 0xff50545c), body.getTopLeft(),
-                                                 juce::Colour (0xff17181b), body.getBottomRight(), false));
-        g.fillEllipse (body);
-        g.setColour (juce::Colours::white.withAlpha (over ? 0.25f : 0.1f));
-        g.drawEllipse (body.reduced (1.0f), 1.0f);
-        draw::led (g, c, r * 0.34f, accent, ! getToggleState());
+        if (lit)
+        {
+            g.setColour (accent.withAlpha (0.2f));
+            g.fillRoundedRectangle (track.expanded (2.5f), radius + 2.5f);
+        }
+        g.setColour (lit ? accent.withAlpha (0.9f) : colours::button);
+        g.fillRoundedRectangle (track, radius);
+        g.setColour (over ? juce::Colours::white.withAlpha (0.2f) : colours::cardEdge);
+        g.drawRoundedRectangle (track, radius, 1.0f);
+
+        const auto thumbSize = track.getHeight() - 5.0f;
+        const auto thumbX = lit ? track.getRight() - thumbSize - 2.5f : track.getX() + 2.5f;
+        g.setColour (juce::Colours::black.withAlpha (0.3f));
+        g.fillEllipse (thumbX, track.getY() + 3.5f, thumbSize, thumbSize);
+        g.setColour (lit ? juce::Colours::white : juce::Colour (0xff8a909b));
+        g.fillEllipse (thumbX, track.getY() + 2.5f, thumbSize, thumbSize);
     }
 
 private:
     juce::Colour accent;
+    bool litWhenOn;
 };
 
 //==============================================================================
-// Backlit analogue VU with spring-damped needle ballistics.
+// Analogue-style VU on a dark face, with spring-damped needle ballistics.
 // Level mode reads RMS with 0 VU = -18 dBFS; Reduction mode reads gain reduction in dB.
 class VuMeter : public juce::Component
 {
 public:
     enum class Mode { level, reduction };
 
-    VuMeter (juce::String labelText, Mode m, std::function<float()> readSource)
-        : label (std::move (labelText)), mode (m), source (std::move (readSource))
+    VuMeter (juce::String labelText, Mode m, std::function<float()> readSource, juce::Colour accentColour = colours::engrave)
+        : label (std::move (labelText)), mode (m), source (std::move (readSource)), accent (accentColour)
     {
         setInterceptsMouseClicks (false, false);
     }
@@ -254,24 +236,21 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        auto bounds = getLocalBounds().toFloat();
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff101114), bounds.getTopLeft(),
-                                                 juce::Colour (0xff3b3e45), bounds.getBottomLeft(), false));
-        g.fillRoundedRectangle (bounds, 8.0f);
+        auto bounds = getLocalBounds().toFloat().reduced (1.0f, 0.0f).withTrimmedBottom (3.0f);
+        draw::card (g, bounds, 12.0f);
 
-        const auto labelArea = bounds.removeFromBottom (20.0f);
-        const auto face = bounds.reduced (5.0f);
+        const auto labelArea = bounds.removeFromBottom (22.0f);
+        const auto face = bounds.reduced (6.0f);
         juce::Path faceShape;
-        faceShape.addRoundedRectangle (face, 5.0f);
+        faceShape.addRoundedRectangle (face, 8.0f);
 
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffbefc8), face.getCentreX(), face.getY() + face.getHeight() * 0.35f,
-                                                 juce::Colour (0xffc99f55), face.getX(), face.getBottom(), true));
+        g.setColour (colours::glass);
         g.fillPath (faceShape);
-
         drawFace (g, face, faceShape);
 
-        g.setFont (draw::font (11.0f, true));
-        draw::engraved (g, label, labelArea.translated (0.0f, -2.0f), juce::Justification::centred);
+        g.setFont (juce::FontOptions (10.5f, juce::Font::bold).withKerningFactor (0.12f));
+        g.setColour (colours::engraveDim);
+        g.drawText (label, labelArea.translated (0.0f, -2.0f), juce::Justification::centred);
     }
 
 private:
@@ -284,8 +263,13 @@ private:
         const auto radius = juce::jmin (face.getHeight() * 0.98f, (face.getWidth() * 0.5f - 10.0f) / (0.92f * std::sin (juce::degreesToRadians (42.0f))));
         const auto sweep = juce::degreesToRadians (42.0f);
         const auto angleAt = [sweep] (float t) { return -sweep + 2.0f * sweep * t; };
-        const auto ink = juce::Colour (0xff2b2219);
-        const auto red = juce::Colour (0xffc23b2a);
+        const auto ink = colours::engraveDim;
+        const auto red = juce::Colour (0xffff5a4a);
+
+        // Faint backlight rising from the pivot.
+        g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.12f), pivot.x, face.getBottom(),
+                                                 accent.withAlpha (0.0f), pivot.x, face.getY(), true));
+        g.fillRect (face);
 
         // Scale arc, red above 0 VU (or the whole arc beyond 10 dB of reduction).
         const auto redStart = mode == Mode::level ? levelPosition (0.0f) : 0.0f;
@@ -323,36 +307,24 @@ private:
                 drawMark (1.0f - (float) db / 20.0f, db % 5 == 0 ? juce::String (db) : juce::String(), db >= 10);
         }
 
-        g.setColour (ink.withAlpha (0.75f));
-        g.setFont (draw::font (14.0f, true));
+        g.setColour (ink.withAlpha (0.6f));
+        g.setFont (draw::font (13.0f, true));
         g.drawText (mode == Mode::level ? "VU" : "GR", face.withTrimmedTop (face.getHeight() * 0.5f).withTrimmedBottom (16.0f),
                     juce::Justification::centred);
 
         if (mode == Mode::level)
             draw::led (g, { face.getRight() - 12.0f, face.getY() + 11.0f }, 3.5f, juce::Colour (0xffff3b2a), peakHold > 0.0f);
 
-        // Needle with a soft shadow, then the pivot housing across the bottom.
+        // Glowing needle, then a hairline edge around the face.
         const auto a = angleAt (position);
-        const juce::Line<float> needle (detail::polar (pivot, radius * 0.3f, a), detail::polar (pivot, radius * 0.97f, a));
-        g.setColour (juce::Colours::black.withAlpha (0.18f));
-        g.drawLine ({ needle.getStart().translated (3.0f, 3.0f), needle.getEnd().translated (3.0f, 3.0f) }, 1.8f);
-        g.setColour (juce::Colour (0xff1a1410));
-        g.drawLine (needle, 1.6f);
-        g.setColour (red);
-        g.drawLine ({ needle.getPointAlongLineProportionally (0.82f), needle.getEnd() }, 1.6f);
+        juce::Path needle;
+        needle.startNewSubPath (detail::polar (pivot, radius * 0.3f, a));
+        needle.lineTo (detail::polar (pivot, radius * 0.97f, a));
+        draw::glow (g, needle, colours::engrave, 1.5f);
+        draw::led (g, { pivot.x, face.getBottom() - 2.0f }, 5.0f, accent, true);
 
-        const auto housing = face.withTop (face.getBottom() - 14.0f);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3a3b40), housing.getTopLeft(),
-                                                 juce::Colour (0xff151618), housing.getBottomLeft(), false));
-        g.fillRect (housing);
-
-        // Glass: glare over the top half and a dark inner edge.
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.28f), face.getTopLeft(),
-                                                 juce::Colours::white.withAlpha (0.0f),
-                                                 juce::Point<float> (face.getX() + face.getWidth() * 0.4f, face.getCentreY()), false));
-        g.fillRect (face);
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.strokePath (faceShape, juce::PathStrokeType (2.5f));
+        g.setColour (colours::cardEdge);
+        g.strokePath (faceShape, juce::PathStrokeType (1.0f));
     }
 
     // Real VU scales are linear in voltage, so 0 VU sits about two thirds of the way across.
@@ -365,11 +337,12 @@ private:
     juce::String label;
     Mode mode;
     std::function<float()> source;
+    juce::Colour accent;
     float position = 0.0f, velocity = 0.0f, peakHold = 0.0f;
 };
 
 //==============================================================================
-// Glass screen in a bezel. Subclasses draw into the screen and get fresh output
+// Dark screen inset in a card. Subclasses draw into the screen and get fresh output
 // samples from the processor once per frame.
 class Display : public juce::Component
 {
@@ -388,14 +361,12 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        const auto bounds = getLocalBounds().toFloat();
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff0e0f12), bounds.getTopLeft(),
-                                                 juce::Colour (0xff3b3e45), bounds.getBottomLeft(), false));
-        g.fillRoundedRectangle (bounds, 9.0f);
+        const auto bounds = getLocalBounds().toFloat().reduced (1.0f, 0.0f).withTrimmedBottom (3.0f);
+        draw::card (g, bounds, 12.0f);
 
-        const auto screen = bounds.reduced (5.0f);
+        const auto screen = bounds.reduced (6.0f);
         juce::Path screenShape;
-        screenShape.addRoundedRectangle (screen, 6.0f);
+        screenShape.addRoundedRectangle (screen, 8.0f);
         g.setColour (colours::glass);
         g.fillPath (screenShape);
 
@@ -408,12 +379,8 @@ public:
             drawContent (g, screen.reduced (10.0f, 8.0f));
         }
 
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.06f), screen.getTopLeft(),
-                                                 juce::Colours::white.withAlpha (0.0f),
-                                                 juce::Point<float> (screen.getX(), screen.getCentreY()), false));
-        g.fillRoundedRectangle (screen.withHeight (screen.getHeight() * 0.5f), 6.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.85f));
-        g.strokePath (screenShape, juce::PathStrokeType (2.0f));
+        g.setColour (colours::cardEdge);
+        g.strokePath (screenShape, juce::PathStrokeType (1.0f));
     }
 
 protected:

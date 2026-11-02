@@ -24,9 +24,9 @@ public:
         addAndMakeVisible (presetBar);
 
         leftMeter = p.reductionMeter()
-                        ? std::make_unique<VuMeter> ("REDUCTION", VuMeter::Mode::reduction, [&p] { return p.meter.load(); })
-                        : std::make_unique<VuMeter> ("INPUT", VuMeter::Mode::level, [&p] { return p.inputRms.load(); });
-        rightMeter = std::make_unique<VuMeter> ("OUTPUT", VuMeter::Mode::level, [&p] { return p.outputRms.load(); });
+                        ? std::make_unique<VuMeter> ("REDUCTION", VuMeter::Mode::reduction, [&p] { return p.meter.load(); }, p.accent())
+                        : std::make_unique<VuMeter> ("INPUT", VuMeter::Mode::level, [&p] { return p.inputRms.load(); }, p.accent());
+        rightMeter = std::make_unique<VuMeter> ("OUTPUT", VuMeter::Mode::level, [&p] { return p.outputRms.load(); }, p.accent());
         addAndMakeVisible (*leftMeter);
         addAndMakeVisible (*rightMeter);
     }
