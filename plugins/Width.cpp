@@ -23,6 +23,16 @@ public:
         width = param ("width");
         space = param ("space");
         output = param ("output");
+
+        factoryPresets = {
+            { "Neutral", {} },
+            { "Wider", { { "width", 130.0f } } },
+            { "Super Wide", { { "width", 170.0f }, { "space", 30.0f } } },
+            { "Deep Space", { { "width", 110.0f }, { "space", 70.0f } } },
+            { "Focused", { { "width", 80.0f }, { "space", 20.0f } } },
+            { "Narrow", { { "width", 60.0f } } },
+            { "Mono Check", { { "width", 0.0f } } },
+        };
     }
 
     static Layout makeLayout()
