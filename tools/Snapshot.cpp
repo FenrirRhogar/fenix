@@ -1,6 +1,7 @@
 // Renders a plugin's editor to PNG while feeding it a synthetic mix, so the meters and
 // displays show live content. Used for README screenshots and visual checks.
-//   <Plugin>_snapshot out.png [factoryPresetIndex]
+//   <Plugin>_snapshot out.png [factoryPresetIndex] [--bench]
+// --bench also prints the average time to paint one full frame of the editor.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -65,6 +66,21 @@ int main (int argc, char* argv[])
         }
         juce::Timer::callPendingTimersSynchronously();
         juce::Thread::sleep (16);
+    }
+
+    if (argc > 3 && juce::String (argv[3]) == "--bench")
+    {
+        constexpr int frames = 60;
+        const auto start = juce::Time::getMillisecondCounterHiRes();
+        for (int i = 0; i < frames; ++i)
+        {
+            mix.render (buffer, sampleRate);
+            processor->processBlock (buffer, midi);
+            juce::Timer::callPendingTimersSynchronously();
+            editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        }
+        std::printf ("%s: %.2f ms per frame\n", processor->getName().toRawUTF8(),
+                     (juce::Time::getMillisecondCounterHiRes() - start) / frames);
     }
 
     const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
