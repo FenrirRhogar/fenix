@@ -42,12 +42,8 @@ namespace draw
     // Stroke with a soft bloom, for lit traces on the glass displays.
     inline void glow (juce::Graphics& g, const juce::Path& path, juce::Colour colour, float width)
     {
-        for (int i = 3; i >= 1; --i)
-        {
-            g.setColour (colour.withAlpha (0.07f * (float) (4 - i)));
-            g.strokePath (path, juce::PathStrokeType (width * (1.0f + 1.8f * (float) i), juce::PathStrokeType::curved,
-                                                      juce::PathStrokeType::rounded));
-        }
+        g.setColour (colour.withAlpha (0.16f));
+        g.strokePath (path, juce::PathStrokeType (width * 3.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setColour (colour);
         g.strokePath (path, juce::PathStrokeType (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }

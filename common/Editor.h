@@ -56,7 +56,10 @@ public:
 
     ~Editor() override { setLookAndFeel (nullptr); }
 
-    void paint (juce::Graphics& g) override
+    void paint (juce::Graphics& g) override { g.drawImageAt (background, 0, 0); }
+
+    // Everything static on the faceplate, rendered once into `background`.
+    void paintFaceplate (juce::Graphics& g)
     {
         const auto bounds = getLocalBounds().toFloat();
         g.setGradientFill (juce::ColourGradient (colours::plateTop, 0.0f, 0.0f, colours::plateBottom, 0.0f, bounds.getBottom(), false));
@@ -116,6 +119,9 @@ public:
         display->setBounds (20 + meterWidth + 14, top, getWidth() - 2 * (20 + meterWidth + 14), mainHeight);
 
         knobPanel = { 20, top + mainHeight + 16, getWidth() - 40, getHeight() - (top + mainHeight + 16) - 30 };
+        background = juce::Image (juce::Image::RGB, getWidth(), getHeight(), false);
+        juce::Graphics bg (background);
+        paintFaceplate (bg);
 
         // Main knobs get wide cells, mix/output trims narrower ones; the group is centred.
         int total = 0;
@@ -133,11 +139,11 @@ private:
     void timerCallback() override
     {
         constexpr float dt = 1.0f / 60.0f;
-        leftMeter->tick (dt);
-        rightMeter->tick (dt);
+        if (leftMeter->tick (dt))
+            leftMeter->repaint();
+        if (rightMeter->tick (dt))
+            rightMeter->repaint();
         display->tick();
-        leftMeter->repaint();
-        rightMeter->repaint();
         display->repaint();
 
         presetBar.refresh();
@@ -145,7 +151,7 @@ private:
 
     Processor& proc;
     LookAndFeel lnf;
-    juce::Image texture;
+    juce::Image texture, background;
 
     std::vector<std::unique_ptr<Knob>> knobs;
     std::vector<bool> compact;

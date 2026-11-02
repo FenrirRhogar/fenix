@@ -227,8 +227,11 @@ public:
         setInterceptsMouseClicks (false, false);
     }
 
-    void tick (float dt)
+    // Returns true when the needle or peak light moved enough to need a repaint.
+    bool tick (float dt)
     {
+        const auto previous = position;
+        const auto wasPeaking = peakHold > 0.0f;
         float target;
         if (mode == Mode::level)
         {
@@ -246,6 +249,7 @@ public:
         velocity += ((target - position) * 170.0f - velocity * 22.0f) * dt;
         position = juce::jlimit (-0.02f, 1.06f, position + velocity * dt);
         peakHold = juce::jmax (0.0f, peakHold - dt);
+        return std::abs (position - previous) > 0.0005f || wasPeaking != (peakHold > 0.0f);
     }
 
     void paint (juce::Graphics& g) override
@@ -402,10 +406,6 @@ public:
                                                      accent.withAlpha (0.0f), screen.getCentreX(), screen.getY(), true));
             g.fillRect (screen);
             drawContent (g, screen.reduced (10.0f, 8.0f));
-
-            g.setColour (juce::Colours::black.withAlpha (0.16f));
-            for (auto y = screen.getY(); y < screen.getBottom(); y += 3.0f)
-                g.drawHorizontalLine ((int) y, screen.getX(), screen.getRight());
         }
 
         g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.06f), screen.getTopLeft(),
@@ -479,13 +479,16 @@ protected:
             }
         }
 
+        // One vertex per pixel column is all the screen can show.
         juce::Path trace;
-        for (int k = 0; k < window; ++k)
+        const auto columns = juce::jmax (2, (int) area.getWidth());
+        for (int c = 0; c < columns; ++c)
         {
+            const auto k = c * (window - 1) / (columns - 1);
             const auto v = juce::jlimit (-1.0f, 1.0f, history[(size_t) ((start + k) % size)] * gain);
-            const auto x = area.getX() + area.getWidth() * (float) k / (float) (window - 1);
+            const auto x = area.getX() + (float) c;
             const auto y = area.getCentreY() - v * area.getHeight() * 0.46f;
-            k == 0 ? trace.startNewSubPath (x, y) : trace.lineTo (x, y);
+            c == 0 ? trace.startNewSubPath (x, y) : trace.lineTo (x, y);
         }
         draw::glow (g, trace, accent.brighter (0.3f), 1.6f);
     }
