@@ -26,6 +26,18 @@ public:
         highGain = param ("highGain");
         highFreq = param ("highFreq");
         output = param ("output");
+
+        // Frequency values are indices: low 30/60/90/120/200 Hz, high 6/8/12/16/20 kHz.
+        factoryPresets = {
+            { "Flat", {} },
+            { "Air Lift", { { "highFreq", 3 }, { "highGain", 3.0f } } },
+            { "Open Top", { { "highFreq", 4 }, { "highGain", 4.5f } } },
+            { "Big Bottom", { { "lowFreq", 1 }, { "lowGain", 3.0f } } },
+            { "Smile", { { "lowFreq", 2 }, { "lowGain", 2.0f }, { "highFreq", 2 }, { "highGain", 2.5f } } },
+            { "Tame Boom", { { "lowFreq", 4 }, { "lowGain", -3.0f } } },
+            { "Vintage Dark", { { "lowFreq", 2 }, { "lowGain", 1.5f }, { "highFreq", 1 }, { "highGain", -3.0f } } },
+            { "Master Polish", { { "lowFreq", 0 }, { "lowGain", 1.5f }, { "highFreq", 4 }, { "highGain", 2.0f } } },
+        };
     }
 
     static Layout makeLayout()
