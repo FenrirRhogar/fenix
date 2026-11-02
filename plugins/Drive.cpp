@@ -17,6 +17,17 @@ public:
         density = param ("density");
         mix = param ("mix");
         output = param ("output");
+
+        factoryPresets = {
+            { "Default", {} },
+            { "Gentle Warmth", { { "drive", 4.0f }, { "density", 20.0f } } },
+            { "Bus Glue", { { "drive", 8.0f }, { "density", 35.0f }, { "output", -0.5f } } },
+            { "Tape Push", { { "drive", 12.0f }, { "density", 25.0f }, { "output", -1.0f } } },
+            { "Thick Bass", { { "drive", 10.0f }, { "density", 70.0f } } },
+            { "Vocal Edge", { { "drive", 7.0f }, { "density", 55.0f }, { "mix", 70.0f } } },
+            { "Drum Crunch", { { "drive", 18.0f }, { "density", 80.0f }, { "mix", 60.0f } } },
+            { "Parallel Grit", { { "drive", 24.0f }, { "density", 100.0f }, { "mix", 30.0f } } },
+        };
     }
 
     static Layout makeLayout()
