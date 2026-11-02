@@ -4,6 +4,8 @@ project(Fenix VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(FENIX_LTO "Link-time optimisation (slow links; turn off for development)" ON)
+
 set(JUCE_DIR "/LEVIATHAN/FROM-WINDOWS/Documents/JUCE" CACHE PATH "Path to a JUCE 8 checkout")
 add_subdirectory(${JUCE_DIR} JUCE)
 
@@ -30,8 +32,10 @@ function(fenix_plugin target name code)
     target_link_libraries(${target}
         PRIVATE juce::juce_audio_utils juce::juce_dsp
         PUBLIC juce::juce_recommended_config_flags
-               juce::juce_recommended_lto_flags
                juce::juce_recommended_warning_flags)
+    if(FENIX_LTO)
+        target_link_libraries(${target} PUBLIC juce::juce_recommended_lto_flags)
+    endif()
 endfunction()
 
 fenix_plugin(Drive     "Drive"     FxDr)  # harmonic saturation
