@@ -39,3 +39,14 @@ fenix_plugin(Shelf     "Shelf EQ"  FxSh)  # broad two-band shelving EQ
 fenix_plugin(HFComp    "HF Comp"   FxHc)  # high-band-only compressor
 fenix_plugin(Width     "Width"     FxWd)  # M/S width + low-band spread
 fenix_plugin(Iron      "Iron"      FxIr)  # output transformer colour
+
+# Optional: one <Plugin>_snapshot executable per plugin that renders its editor to PNG.
+option(FENIX_SNAPSHOTS "Build editor snapshot tools" OFF)
+if(FENIX_SNAPSHOTS)
+    foreach(plugin Drive Shelf HFComp Width Iron)
+        add_executable(${plugin}_snapshot tools/Snapshot.cpp)
+        target_include_directories(${plugin}_snapshot PRIVATE $<TARGET_PROPERTY:${plugin},INCLUDE_DIRECTORIES>)
+        target_compile_definitions(${plugin}_snapshot PRIVATE $<TARGET_PROPERTY:${plugin},COMPILE_DEFINITIONS>)
+        target_link_libraries(${plugin}_snapshot PRIVATE ${plugin})
+    endforeach()
+endif()
