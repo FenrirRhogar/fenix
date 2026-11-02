@@ -56,6 +56,8 @@ public:
         }
     }
 
+    bool isStepped() const { return ! stepLabels.isEmpty(); }
+
     void paint (juce::Graphics& g) override
     {
         auto bounds = getLocalBounds().toFloat();

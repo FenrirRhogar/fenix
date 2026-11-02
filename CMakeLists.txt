@@ -48,7 +48,7 @@ fenix_plugin(Bus       "Bus"       FxBs)  # all five stages in one chain
 # Optional: one <Plugin>_snapshot executable per plugin that renders its editor to PNG.
 option(FENIX_SNAPSHOTS "Build editor snapshot tools" OFF)
 if(FENIX_SNAPSHOTS)
-    foreach(plugin Drive Shelf HFComp Width Iron)
+    foreach(plugin Drive Shelf HFComp Width Iron Bus)
         add_executable(${plugin}_snapshot tools/Snapshot.cpp)
         target_include_directories(${plugin}_snapshot PRIVATE $<TARGET_PROPERTY:${plugin},INCLUDE_DIRECTORIES>)
         target_compile_definitions(${plugin}_snapshot PRIVATE $<TARGET_PROPERTY:${plugin},COMPILE_DEFINITIONS>)
