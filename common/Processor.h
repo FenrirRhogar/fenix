@@ -26,8 +26,9 @@ public:
         : AudioProcessor (BusesProperties()
                               .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                               .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-          apvts (*this, nullptr, "PARAMS", std::move (layout))
+          apvts (*this, nullptr, "PARAMS", withBypass (std::move (layout)))
     {
+        bypass = apvts.getRawParameterValue ("bypass");
     }
 
     virtual void prepare (double sampleRate, int maxBlockSize) = 0;
@@ -42,7 +43,18 @@ public:
     std::atomic<float> meter { 0.0f };
 
     //==============================================================================
-    void prepareToPlay (double sampleRate, int maxBlockSize) override { prepare (sampleRate, maxBlockSize); }
+    void prepareToPlay (double sampleRate, int maxBlockSize) override
+    {
+        prepare (sampleRate, maxBlockSize);
+
+        // Bypass crossfades to a dry path delayed by the plugin's latency, so it never clicks or shifts timing.
+        const auto channels = juce::jmax (1, getTotalNumInputChannels());
+        dryBuffer.setSize (channels, maxBlockSize);
+        dryDelay.prepare ({ sampleRate, (juce::uint32) maxBlockSize, (juce::uint32) channels });
+        dryDelay.setDelay ((float) getLatencySamples());
+        bypassMix.reset (sampleRate, 0.02);
+        bypassMix.setCurrentAndTargetValue (bypass->load() > 0.5f ? 1.0f : 0.0f);
+    }
     void releaseResources() override {}
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override
@@ -59,10 +71,33 @@ public:
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
     {
         juce::ScopedNoDenormals noDenormals;
-        for (auto ch = getTotalNumInputChannels(); ch < getTotalNumOutputChannels(); ++ch)
-            buffer.clear (ch, 0, buffer.getNumSamples());
+        const int numChannels = getTotalNumInputChannels();
+        const int numSamples = buffer.getNumSamples();
+        for (auto ch = numChannels; ch < getTotalNumOutputChannels(); ++ch)
+            buffer.clear (ch, 0, numSamples);
+
+        if (dryBuffer.getNumSamples() < numSamples)
+            dryBuffer.setSize (dryBuffer.getNumChannels(), numSamples, false, false, true);
+        for (int ch = 0; ch < numChannels; ++ch)
+            dryBuffer.copyFrom (ch, 0, buffer, ch, 0, numSamples);
+
         process (buffer);
+
+        bypassMix.setTargetValue (bypass->load() > 0.5f ? 1.0f : 0.0f);
+        for (int n = 0; n < numSamples; ++n)
+        {
+            const float b = bypassMix.getNextValue();
+            for (int ch = 0; ch < numChannels; ++ch)
+            {
+                dryDelay.pushSample (ch, dryBuffer.getSample (ch, n));
+                const float dry = dryDelay.popSample (ch);
+                const float wet = buffer.getSample (ch, n);
+                buffer.setSample (ch, n, wet + b * (dry - wet));
+            }
+        }
     }
+
+    juce::AudioProcessorParameter* getBypassParameter() const override { return apvts.getParameter ("bypass"); }
 
     juce::AudioProcessorEditor* createEditor() override; // defined in Editor.h
     bool hasEditor() const override { return true; }
@@ -91,6 +126,18 @@ public:
             if (xml->hasTagName (apvts.state.getType()))
                 apvts.replaceState (juce::ValueTree::fromXml (*xml));
     }
+
+private:
+    static Layout withBypass (Layout layout)
+    {
+        layout.add (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "bypass", 1 }, "Bypass", false));
+        return layout;
+    }
+
+    std::atomic<float>* bypass = nullptr;
+    juce::AudioBuffer<float> dryBuffer;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay { 4096 };
+    juce::SmoothedValue<float> bypassMix;
 };
 
 //==============================================================================
