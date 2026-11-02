@@ -35,3 +35,4 @@ function(fenix_plugin target name code)
 endfunction()
 
 fenix_plugin(Drive     "Drive"     FxDr)  # harmonic saturation
+fenix_plugin(Shelf     "Shelf EQ"  FxSh)  # broad two-band shelving EQ
