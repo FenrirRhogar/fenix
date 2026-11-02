@@ -37,8 +37,9 @@ public:
         return layout;
     }
 
+    juce::String tagline() const override { return "High-frequency compressor"; }
     juce::Colour accent() const override { return juce::Colour (0xff4fc3d9); }
-    MeterSpec meterSpec() const override { return { "HF Reduction", 0.0f, 12.0f, " dB" }; }
+    bool reductionMeter() const override { return true; }
 
     void prepare (double sampleRate, int maxBlockSize) override
     {

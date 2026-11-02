@@ -10,13 +10,7 @@ namespace fenix
 
 using Layout = juce::AudioProcessorValueTreeState::ParameterLayout;
 
-// What the editor's meter strip shows; an empty label hides it.
-struct MeterSpec
-{
-    juce::String label;
-    float min = 0.0f, max = 1.0f;
-    juce::String unit;
-};
+class Display;
 
 // A factory preset: parameter values in plain units (choice params use their index).
 // Parameters a preset leaves out go back to their defaults.
@@ -81,7 +75,9 @@ public:
     virtual void process (juce::AudioBuffer<float>& buffer) = 0;
     virtual juce::Colour accent() const = 0;
     virtual bool allowMono() const { return true; }
-    virtual MeterSpec meterSpec() const { return {}; }
+    virtual juce::String tagline() const { return {}; }
+    virtual bool reductionMeter() const { return false; } // left VU shows gain reduction instead of input
+    virtual std::unique_ptr<Display> createDisplay();      // defaults to an oscilloscope; see Editor.h
 
     std::atomic<float>* param (const char* id) { return apvts.getRawParameterValue (id); }
 

@@ -29,6 +29,7 @@ public:
         return layout;
     }
 
+    juce::String tagline() const override { return "Harmonic saturator"; }
     juce::Colour accent() const override { return juce::Colour (0xffe8743b); }
 
     void prepare (double sampleRate, int maxBlockSize) override

@@ -33,6 +33,7 @@ public:
         return layout;
     }
 
+    juce::String tagline() const override { return "Output transformer"; }
     juce::Colour accent() const override { return juce::Colour (0xffd9b44a); }
 
     void prepare (double sampleRate, int maxBlockSize) override

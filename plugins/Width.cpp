@@ -34,9 +34,9 @@ public:
         return layout;
     }
 
+    juce::String tagline() const override { return "Stereo image processor"; }
     juce::Colour accent() const override { return juce::Colour (0xff6ccf8a); }
     bool allowMono() const override { return false; }
-    MeterSpec meterSpec() const override { return { "Correlation", -1.0f, 1.0f, "" }; }
 
     void prepare (double sampleRate, int) override
     {

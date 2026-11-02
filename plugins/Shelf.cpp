@@ -39,6 +39,7 @@ public:
         return layout;
     }
 
+    juce::String tagline() const override { return "Broad shelving equaliser"; }
     juce::Colour accent() const override { return juce::Colour (0xff9b7cf0); }
 
     void prepare (double sampleRate, int maxBlockSize) override
