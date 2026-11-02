@@ -7,14 +7,16 @@ namespace fenix
 
 namespace colours
 {
-    const juce::Colour plateTop { 0xff32353c };
-    const juce::Colour plateBottom { 0xff1d1f23 };
-    const juce::Colour recess { 0xff15161a };
-    const juce::Colour glass { 0xff0b0d10 };
-    const juce::Colour engrave { 0xffc9ccd3 };
-    const juce::Colour engraveDim { 0xff8d929c };
-    const juce::Colour tickOff { 0xff474b54 };
-    const juce::Colour lcd { 0xff0c0d0f };
+    const juce::Colour plateTop { 0xff1e2127 };
+    const juce::Colour plateBottom { 0xff131519 };
+    const juce::Colour card { 0xff1a1d22 };
+    const juce::Colour cardEdge { 0x10ffffff };
+    const juce::Colour glass { 0xff0c0e11 };
+    const juce::Colour engrave { 0xffe2e5ea };
+    const juce::Colour engraveDim { 0xff868c97 };
+    const juce::Colour tickOff { 0xff2f333b };
+    const juce::Colour lcd { 0xff101216 };
+    const juce::Colour button { 0xff252930 };
 }
 
 namespace draw
@@ -29,17 +31,17 @@ namespace draw
         return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), height, juce::Font::plain);
     }
 
-    // Text stamped into metal: a dark shadow one pixel below the light letters.
+    // Panel label text with a faint drop shadow so it stays crisp on gradients.
     inline void engraved (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area,
                           juce::Justification just, juce::Colour colour = colours::engrave)
     {
-        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
         g.drawText (text, area.translated (0.0f, 1.0f), just, false);
         g.setColour (colour);
         g.drawText (text, area, just, false);
     }
 
-    // Stroke with a soft bloom, for lit traces on the glass displays.
+    // Stroke with a soft bloom, for lit traces on the displays.
     inline void glow (juce::Graphics& g, const juce::Path& path, juce::Colour colour, float width)
     {
         g.setColour (colour.withAlpha (0.16f));
@@ -48,7 +50,7 @@ namespace draw
         g.strokePath (path, juce::PathStrokeType (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
-    // A lit LED dot with halo.
+    // A lit dot with halo.
     inline void led (juce::Graphics& g, juce::Point<float> centre, float radius, juce::Colour colour, bool on)
     {
         if (on)
@@ -58,60 +60,20 @@ namespace draw
             g.fillEllipse (juce::Rectangle<float> (radius * 7.0f, radius * 7.0f).withCentre (centre));
         }
         const auto body = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
-        g.setGradientFill (juce::ColourGradient (on ? colour.brighter (0.8f) : colour.darker (2.5f), body.getTopLeft(),
-                                                 on ? colour : colour.darker (3.5f), body.getBottomRight(), false));
+        g.setColour (on ? colour.brighter (0.4f) : colour.darker (2.5f).withAlpha (0.8f));
         g.fillEllipse (body);
-        g.setColour (juce::Colours::black.withAlpha (0.6f));
-        g.drawEllipse (body, 1.0f);
     }
 
-    inline void screw (juce::Graphics& g, juce::Point<float> centre, float angle)
+    // Raised card: soft shadow, slightly lighter top edge and a hairline border.
+    inline void card (juce::Graphics& g, juce::Rectangle<float> area, float corner = 12.0f)
     {
-        const auto r = 6.0f;
-        const auto head = juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (centre);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.fillEllipse (head.translated (0.0f, 1.0f).expanded (1.0f));
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff9a9ea6), head.getTopLeft(),
-                                                 juce::Colour (0xff3b3e44), head.getBottomRight(), false));
-        g.fillEllipse (head);
-
-        juce::Path slot;
-        slot.addRoundedRectangle (-r * 0.75f, -0.9f, r * 1.5f, 1.8f, 0.9f);
-        g.setColour (juce::Colour (0xff1c1d20));
-        g.fillPath (slot, juce::AffineTransform::rotation (angle).translated (centre));
-    }
-
-    // Recessed panel: darker fill, shadowed top edge, highlighted bottom edge.
-    inline void recess (juce::Graphics& g, juce::Rectangle<float> area, float corner)
-    {
-        g.setColour (colours::recess.withAlpha (0.55f));
+        g.setColour (juce::Colours::black.withAlpha (0.28f));
+        g.fillRoundedRectangle (area.translated (0.0f, 3.0f).expanded (1.0f), corner + 1.0f);
+        g.setGradientFill (juce::ColourGradient (colours::card.brighter (0.07f), area.getTopLeft(),
+                                                 colours::card, area.getBottomLeft(), false));
         g.fillRoundedRectangle (area, corner);
-        g.setColour (juce::Colours::black.withAlpha (0.55f));
-        g.drawRoundedRectangle (area.translated (0.0f, -0.5f), corner, 1.2f);
-        g.setColour (juce::Colours::white.withAlpha (0.06f));
-        g.drawRoundedRectangle (area.translated (0.0f, 1.0f), corner, 1.0f);
-    }
-
-    // Fine horizontal grain, generated once per size and reused.
-    inline juce::Image brushedTexture (int width, int height)
-    {
-        juce::Image image (juce::Image::ARGB, width, height, true);
-        juce::Graphics g (image);
-        juce::Random random (0xf3e41);
-        for (int y = 0; y < height; ++y)
-        {
-            int x = 0;
-            while (x < width)
-            {
-                const int len = 20 + random.nextInt (220);
-                const bool light = random.nextBool();
-                g.setColour ((light ? juce::Colours::white : juce::Colours::black)
-                                 .withAlpha (random.nextFloat() * (light ? 0.035f : 0.06f)));
-                g.drawHorizontalLine (y, (float) x, (float) juce::jmin (width, x + len));
-                x += len;
-            }
-        }
-        return image;
+        g.setColour (colours::cardEdge);
+        g.drawRoundedRectangle (area.reduced (0.5f), corner, 1.0f);
     }
 
     // Fenix mark: a stylised flame rising from a split base.
@@ -139,70 +101,50 @@ public:
 
     LookAndFeel()
     {
-        setColour (juce::PopupMenu::backgroundColourId, juce::Colour (0xff1e2025));
+        setColour (juce::PopupMenu::backgroundColourId, juce::Colour (0xff1b1e23));
         setColour (juce::PopupMenu::textColourId, colours::engrave);
         setColour (juce::PopupMenu::headerTextColourId, colours::engraveDim);
-        setColour (juce::ComboBox::textColourId, colours::engrave);
-        setColour (juce::AlertWindow::backgroundColourId, juce::Colour (0xff23252a));
+        setColour (juce::AlertWindow::backgroundColourId, juce::Colour (0xff1d2025));
         setColour (juce::AlertWindow::textColourId, colours::engrave);
         setColour (juce::TextEditor::backgroundColourId, colours::lcd);
         setColour (juce::TextEditor::textColourId, colours::engrave);
         setColour (juce::TextEditor::outlineColourId, colours::tickOff);
-        setColour (juce::TextButton::buttonColourId, juce::Colour (0xff2c2f35));
+        setColour (juce::TextButton::buttonColourId, colours::button);
         setColour (juce::TextButton::textColourOffId, colours::engrave);
     }
 
     void setAccent (juce::Colour c)
     {
         accent = c;
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, c.withAlpha (0.35f));
+        setColour (juce::PopupMenu::highlightedBackgroundColourId, c.withAlpha (0.3f));
         setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
         setColour (juce::TextEditor::focusedOutlineColourId, c);
         setColour (juce::TextEditor::highlightColourId, c.withAlpha (0.4f));
     }
 
-    // Preset selector: a small backlit LCD window.
-    void drawComboBox (juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override
-    {
-        const auto area = juce::Rectangle<int> (width, height).toFloat().reduced (0.5f);
-        g.setColour (colours::lcd);
-        g.fillRoundedRectangle (area, 4.0f);
-        g.setColour (juce::Colours::black);
-        g.drawRoundedRectangle (area, 4.0f, 1.0f);
-        g.setColour (juce::Colours::white.withAlpha (box.isMouseOver (true) ? 0.12f : 0.05f));
-        g.drawRoundedRectangle (area.translated (0.0f, 1.0f), 4.0f, 1.0f);
-
-        juce::Path arrow;
-        const auto cx = (float) width - 14.0f, cy = (float) height * 0.5f;
-        arrow.addTriangle (cx - 4.0f, cy - 2.0f, cx + 4.0f, cy - 2.0f, cx, cy + 3.0f);
-        g.setColour (accent.withAlpha (0.9f));
-        g.fillPath (arrow);
-    }
-
-    juce::Font getComboBoxFont (juce::ComboBox&) override { return draw::mono (13.0f); }
-
-    void positionComboBoxText (juce::ComboBox& box, juce::Label& label) override
-    {
-        label.setBounds (8, 1, box.getWidth() - 30, box.getHeight() - 2);
-        label.setFont (getComboBoxFont (box));
-        label.setColour (juce::Label::textColourId, accent.brighter (0.3f));
-    }
-
     juce::Font getPopupMenuFont() override { return draw::font (14.0f); }
+
+    void drawPopupMenuBackground (juce::Graphics& g, int width, int height) override
+    {
+        g.fillAll (findColour (juce::PopupMenu::backgroundColourId));
+        g.setColour (colours::cardEdge);
+        g.drawRect (0, 0, width, height);
+    }
 
     void drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool over, bool down) override
     {
         const auto area = b.getLocalBounds().toFloat().reduced (0.5f);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (down ? 0xff26282d : 0xff3a3d44), area.getTopLeft(),
-                                                 juce::Colour (0xff222428), area.getBottomLeft(), false));
-        g.fillRoundedRectangle (area, 4.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.7f));
-        g.drawRoundedRectangle (area, 4.0f, 1.0f);
-        g.setColour (juce::Colours::white.withAlpha (over ? 0.16f : 0.08f));
-        g.drawHorizontalLine (1, area.getX() + 3.0f, area.getRight() - 3.0f);
+        const auto corner = juce::jmin (8.0f, area.getHeight() * 0.5f);
+        g.setColour (colours::button.brighter (down ? 0.02f : (over ? 0.12f : 0.0f)));
+        g.fillRoundedRectangle (area, corner);
+        g.setColour (over ? accent.withAlpha (0.45f) : colours::cardEdge);
+        g.drawRoundedRectangle (area, corner, 1.0f);
     }
 
-    juce::Font getTextButtonFont (juce::TextButton&, int) override { return draw::font (12.0f, true); }
+    juce::Font getTextButtonFont (juce::TextButton&, int) override
+    {
+        return juce::FontOptions (11.5f, juce::Font::bold).withKerningFactor (0.08f);
+    }
 };
 
 } // namespace fenix

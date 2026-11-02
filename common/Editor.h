@@ -8,37 +8,20 @@
 namespace fenix
 {
 
-// The faceplate: logo and preset bar across the top, meters either side of the
-// plugin's display, and a recessed row of knobs, one per parameter.
-class Editor : public juce::AudioProcessorEditor, private juce::Timer
+// Chrome shared by every Fenix editor: header with logo, preset bar and power switch,
+// input/output meters, a background cached as an image, and a 60 Hz frame timer.
+// Subclasses add their controls, lay them out in layout() and draw static panels in paintPanels().
+class EditorBase : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    static constexpr int width = 860, height = 500;
-
-    explicit Editor (Processor& p) : AudioProcessorEditor (p), proc (p), power (p.accent()), presetBar (p)
+    explicit EditorBase (Processor& p) : AudioProcessorEditor (p), proc (p), power (p.accent()), presetBar (p)
     {
         lnf.setAccent (p.accent());
         setLookAndFeel (&lnf);
 
-        for (auto* raw : p.getParameters())
-        {
-            auto* param = dynamic_cast<juce::RangedAudioParameter*> (raw);
-            if (param == nullptr || param->getParameterID() == "bypass")
-                continue;
-
-            auto& knob = *knobs.emplace_back (std::make_unique<Knob> (*param, p.accent()));
-            attachments.push_back (std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (p.apvts, param->getParameterID(), knob));
-            knob.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
-            knob.setPopupMenuEnabled (false);
-            compact.push_back (param->getParameterID() == "output" || param->getParameterID() == "mix");
-            addAndMakeVisible (knob);
-        }
-
         powerAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (p.apvts, "bypass", power);
         addAndMakeVisible (power);
-
-        display = p.createDisplay();
-        addAndMakeVisible (*display);
+        addAndMakeVisible (presetBar);
 
         leftMeter = p.reductionMeter()
                         ? std::make_unique<VuMeter> ("REDUCTION", VuMeter::Mode::reduction, [&p] { return p.meter.load(); })
@@ -46,96 +29,90 @@ public:
         rightMeter = std::make_unique<VuMeter> ("OUTPUT", VuMeter::Mode::level, [&p] { return p.outputRms.load(); });
         addAndMakeVisible (*leftMeter);
         addAndMakeVisible (*rightMeter);
+    }
 
-        addAndMakeVisible (presetBar);
+    ~EditorBase() override { setLookAndFeel (nullptr); }
 
-        texture = draw::brushedTexture (width, height);
+    void paint (juce::Graphics& g) override { g.drawImageAt (background, 0, 0); }
+
+    void resized() override
+    {
+        power.setBounds (getWidth() - 68, 21, 46, 24);
+        presetBar.setBounds (getWidth() - 480, 19, 390, 28);
+        layout();
+
+        background = juce::Image (juce::Image::RGB, getWidth(), getHeight(), false);
+        juce::Graphics g (background);
+        paintFaceplate (g);
+        paintPanels (g);
+    }
+
+protected:
+    virtual void layout() = 0;
+    virtual void paintPanels (juce::Graphics&) {}
+    virtual void tick() {}
+
+    // Call at the end of the subclass constructor, once every child exists.
+    void start (int width, int height)
+    {
         setSize (width, height);
         startTimerHz (60);
     }
 
-    ~Editor() override { setLookAndFeel (nullptr); }
+    Knob& addKnob (juce::RangedAudioParameter& param, juce::Colour accent)
+    {
+        auto& knob = *knobs.emplace_back (std::make_unique<Knob> (param, accent));
+        attachments.push_back (std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.apvts, param.getParameterID(), knob));
+        knob.setDoubleClickReturnValue (true, param.convertFrom0to1 (param.getDefaultValue()));
+        knob.setPopupMenuEnabled (false);
+        addAndMakeVisible (knob);
+        return knob;
+    }
 
-    void paint (juce::Graphics& g) override { g.drawImageAt (background, 0, 0); }
+    Processor& proc;
+    LookAndFeel lnf;
+    std::vector<std::unique_ptr<Knob>> knobs;
+    std::unique_ptr<VuMeter> leftMeter, rightMeter;
 
-    // Everything static on the faceplate, rendered once into `background`.
+private:
     void paintFaceplate (juce::Graphics& g)
     {
         const auto bounds = getLocalBounds().toFloat();
+        const auto accent = proc.accent();
         g.setGradientFill (juce::ColourGradient (colours::plateTop, 0.0f, 0.0f, colours::plateBottom, 0.0f, bounds.getBottom(), false));
         g.fillAll();
-        g.drawImageAt (texture, 0, 0);
 
-        // Accent strip along the top edge with a soft glow, the plugin's colour identity.
-        g.setGradientFill (juce::ColourGradient (proc.accent().withAlpha (0.35f), 0.0f, 0.0f,
-                                                 proc.accent().withAlpha (0.0f), 0.0f, 14.0f, false));
-        g.fillRect (bounds.withHeight (14.0f));
-        g.setColour (proc.accent());
+        // Soft accent glow from the top edge: the plugin's colour identity.
+        g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.16f), bounds.getCentreX(), 0.0f,
+                                                 accent.withAlpha (0.0f), bounds.getCentreX(), 90.0f, false));
+        g.fillRect (bounds.withHeight (90.0f));
+        g.setColour (accent);
         g.fillRect (bounds.withHeight (2.0f));
 
-        // Header: flame mark, suite name, plugin name and tagline.
-        const auto mark = draw::flame ({ 32.0f, 16.0f, 20.0f, 30.0f });
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffffd56b), 42.0f, 18.0f, proc.accent().darker (0.4f), 42.0f, 46.0f, false));
+        const auto mark = draw::flame ({ 26.0f, 17.0f, 20.0f, 30.0f });
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffffd56b), 36.0f, 18.0f, accent.darker (0.3f), 36.0f, 47.0f, false));
         g.fillPath (mark);
 
-        g.setFont (juce::FontOptions (24.0f, juce::Font::bold).withKerningFactor (0.18f));
-        draw::engraved (g, "FENIX", { 62.0f, 13.0f, 110.0f, 26.0f }, juce::Justification::centredLeft);
-        const auto pluginName = proc.getName().fromFirstOccurrenceOf ("Fenix ", false, false).toUpperCase();
-        g.setFont (juce::FontOptions (16.0f, juce::Font::bold).withKerningFactor (0.12f));
-        g.setColour (proc.accent().brighter (0.2f));
-        g.drawText (pluginName, juce::Rectangle<float> (166.0f, 17.0f, 200.0f, 22.0f), juce::Justification::centredLeft);
-        g.setFont (draw::font (11.0f));
-        draw::engraved (g, proc.tagline(), { 63.0f, 38.0f, 300.0f, 14.0f }, juce::Justification::centredLeft, colours::engraveDim);
+        g.setFont (juce::FontOptions (23.0f, juce::Font::bold).withKerningFactor (0.2f));
+        draw::engraved (g, "FENIX", { 56.0f, 14.0f, 110.0f, 26.0f }, juce::Justification::centredLeft);
+        g.setFont (juce::FontOptions (15.0f, juce::Font::bold).withKerningFactor (0.14f));
+        g.setColour (accent.brighter (0.25f));
+        g.drawText (proc.getName().fromFirstOccurrenceOf ("Fenix ", false, false).toUpperCase(),
+                    juce::Rectangle<float> (160.0f, 18.0f, 220.0f, 20.0f), juce::Justification::centredLeft);
+        g.setFont (draw::font (11.5f));
+        g.setColour (colours::engraveDim);
+        g.drawText (proc.tagline(), juce::Rectangle<float> (57.0f, 40.0f, 300.0f, 14.0f), juce::Justification::centredLeft);
 
-        g.setFont (draw::font (10.0f, true));
-        draw::engraved (g, "IN", juce::Rectangle<float> (power.getBounds().toFloat()).translated (0.0f, 22.0f), juce::Justification::centred, colours::engraveDim);
-
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.fillRect (16.0f, 64.0f, bounds.getWidth() - 32.0f, 1.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.07f));
-        g.fillRect (16.0f, 65.0f, bounds.getWidth() - 32.0f, 1.0f);
-
-        draw::recess (g, knobPanel.toFloat(), 10.0f);
-
-        for (auto [x, y] : { std::pair { 12.0f, 12.0f }, { bounds.getRight() - 12.0f, 12.0f },
-                             { 12.0f, bounds.getBottom() - 12.0f }, { bounds.getRight() - 12.0f, bounds.getBottom() - 12.0f } })
-            draw::screw (g, { x, y }, x * 0.37f + y * 0.11f);
+        g.setColour (colours::cardEdge);
+        g.fillRect (20.0f, 66.0f, bounds.getWidth() - 40.0f, 1.0f);
 
         g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.25f));
-        draw::engraved (g, "FENRIKOS", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedRight (30.0f),
-                        juce::Justification::centredRight, colours::engraveDim);
-        draw::engraved (g, "FENIX COLOUR SERIES", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedLeft (30.0f),
-                        juce::Justification::centredLeft, colours::engraveDim.withAlpha (0.6f));
+        g.setColour (colours::engraveDim.withAlpha (0.8f));
+        g.drawText ("FENRIKOS", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedRight (24.0f), juce::Justification::centredRight);
+        g.setColour (colours::engraveDim.withAlpha (0.45f));
+        g.drawText ("FENIX COLOUR SERIES", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedLeft (24.0f), juce::Justification::centredLeft);
     }
 
-    void resized() override
-    {
-        power.setBounds (getWidth() - 62, 14, 32, 32);
-        presetBar.setBounds (getWidth() - 470, 18, 390, 26);
-
-        const int meterWidth = 176, top = 80, mainHeight = 200;
-        leftMeter->setBounds (20, top, meterWidth, mainHeight);
-        rightMeter->setBounds (getWidth() - 20 - meterWidth, top, meterWidth, mainHeight);
-        display->setBounds (20 + meterWidth + 14, top, getWidth() - 2 * (20 + meterWidth + 14), mainHeight);
-
-        knobPanel = { 20, top + mainHeight + 16, getWidth() - 40, getHeight() - (top + mainHeight + 16) - 30 };
-        background = juce::Image (juce::Image::RGB, getWidth(), getHeight(), false);
-        juce::Graphics bg (background);
-        paintFaceplate (bg);
-
-        // Main knobs get wide cells, mix/output trims narrower ones; the group is centred.
-        int total = 0;
-        for (bool small : compact)
-            total += small ? 112 : 150;
-        auto cells = knobPanel.reduced (0, 8).withSizeKeepingCentre (juce::jmin (total, knobPanel.getWidth() - 20), knobPanel.getHeight() - 16);
-        for (size_t i = 0; i < knobs.size(); ++i)
-        {
-            auto cell = cells.removeFromLeft (compact[i] ? 112 : 150);
-            knobs[i]->setBounds (compact[i] ? cell.withTrimmedTop (22) : cell);
-        }
-    }
-
-private:
     void timerCallback() override
     {
         constexpr float dt = 1.0f / 60.0f;
@@ -143,27 +120,74 @@ private:
             leftMeter->repaint();
         if (rightMeter->tick (dt))
             rightMeter->repaint();
-        display->tick();
-        display->repaint();
-
+        tick();
         presetBar.refresh();
     }
 
-    Processor& proc;
-    LookAndFeel lnf;
-    juce::Image texture, background;
-
-    std::vector<std::unique_ptr<Knob>> knobs;
-    std::vector<bool> compact;
-    std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> attachments;
     PowerButton power;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> powerAttachment;
-
-    std::unique_ptr<Display> display;
-    std::unique_ptr<VuMeter> leftMeter, rightMeter;
-    juce::Rectangle<int> knobPanel;
-
     PresetBar presetBar;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> powerAttachment;
+    std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> attachments;
+    juce::Image background;
+};
+
+//==============================================================================
+// Single-plugin editor: meters either side of the plugin's display, and a row of knobs,
+// one per parameter, with mix/output trims drawn smaller.
+class Editor : public EditorBase
+{
+public:
+    explicit Editor (Processor& p) : EditorBase (p)
+    {
+        for (auto* raw : p.getParameters())
+        {
+            auto* param = dynamic_cast<juce::RangedAudioParameter*> (raw);
+            if (param == nullptr || param->getParameterID() == "bypass")
+                continue;
+
+            addKnob (*param, p.accent());
+            compact.push_back (param->getParameterID() == "output" || param->getParameterID() == "mix");
+        }
+
+        display = p.createDisplay();
+        addAndMakeVisible (*display);
+        start (860, 500);
+    }
+
+protected:
+    void layout() override
+    {
+        const int meterWidth = 176, top = 82, mainHeight = 200;
+        leftMeter->setBounds (20, top, meterWidth, mainHeight);
+        rightMeter->setBounds (getWidth() - 20 - meterWidth, top, meterWidth, mainHeight);
+        display->setBounds (20 + meterWidth + 14, top, getWidth() - 2 * (20 + meterWidth + 14), mainHeight);
+
+        knobPanel = { 20, top + mainHeight + 16, getWidth() - 40, getHeight() - (top + mainHeight + 16) - 30 };
+
+        // Main knobs get wide cells, mix/output trims narrower ones; the group is centred.
+        int total = 0;
+        for (bool small : compact)
+            total += small ? 112 : 150;
+        auto cells = knobPanel.reduced (0, 10).withSizeKeepingCentre (juce::jmin (total, knobPanel.getWidth() - 20), knobPanel.getHeight() - 20);
+        for (size_t i = 0; i < knobs.size(); ++i)
+        {
+            auto cell = cells.removeFromLeft (compact[i] ? 112 : 150);
+            knobs[i]->setBounds (compact[i] ? cell.withTrimmedTop (22) : cell);
+        }
+    }
+
+    void paintPanels (juce::Graphics& g) override { draw::card (g, knobPanel.toFloat(), 14.0f); }
+
+    void tick() override
+    {
+        display->tick();
+        display->repaint();
+    }
+
+private:
+    std::vector<bool> compact;
+    std::unique_ptr<Display> display;
+    juce::Rectangle<int> knobPanel;
 };
 
 inline juce::AudioProcessorEditor* Processor::createEditor() { return new Editor (*this); }
