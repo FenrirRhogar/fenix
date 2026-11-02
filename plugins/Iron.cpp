@@ -23,6 +23,15 @@ public:
     {
         amount = param ("amount");
         output = param ("output");
+
+        factoryPresets = {
+            { "Default", {} },
+            { "Light Touch", { { "amount", 20.0f } } },
+            { "Subtle Weight", { { "amount", 35.0f } } },
+            { "Warm Iron", { { "amount", 65.0f }, { "output", -0.5f } } },
+            { "Heavy Iron", { { "amount", 85.0f }, { "output", -1.0f } } },
+            { "Saturated Core", { { "amount", 100.0f }, { "output", -1.5f } } },
+        };
     }
 
     static Layout makeLayout()
