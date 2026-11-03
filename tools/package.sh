@@ -7,7 +7,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build="${1:-$root/build}"
 version="$(sed -n 's/^project(Fenix VERSION \([0-9.]*\).*/\1/p' "$root/CMakeLists.txt")"
-juce="$(sed -n 's/^JUCE_DIR:PATH=//p' "$build/CMakeCache.txt")"
+juce="${JUCE_DIR:-$(sed -n 's/^JUCE_DIR:PATH=//p' "$build/CMakeCache.txt")}"
 sdk="$juce/modules/juce_audio_processors_headless/format_types"
 name="Fenix-$version-Linux-x64"
 stage="$root/dist/$name"

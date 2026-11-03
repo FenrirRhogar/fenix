@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(FENIX_LTO "Link-time optimisation (slow links; turn off for development)" ON)
+option(FENIX_COPY_AFTER_BUILD "Install built plugins into ~/.vst3 and ~/.lv2" ON)
 
 set(JUCE_DIR "/LEVIATHAN/FROM-WINDOWS/Documents/JUCE" CACHE PATH "Path to a JUCE 8 checkout")
 add_subdirectory(${JUCE_DIR} JUCE)
@@ -21,7 +22,7 @@ function(fenix_plugin target name code)
         NEEDS_MIDI_INPUT FALSE
         NEEDS_MIDI_OUTPUT FALSE
         VST3_CATEGORIES Fx
-        COPY_PLUGIN_AFTER_BUILD TRUE)
+        COPY_PLUGIN_AFTER_BUILD ${FENIX_COPY_AFTER_BUILD})
 
     target_sources(${target} PRIVATE plugins/${target}.cpp)
     target_include_directories(${target} PRIVATE common)
