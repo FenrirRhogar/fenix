@@ -10,13 +10,24 @@ option(FENIX_COPY_AFTER_BUILD "Install built plugins into ~/.vst3 and ~/.lv2" ON
 set(JUCE_DIR "/LEVIATHAN/FROM-WINDOWS/Documents/JUCE" CACHE PATH "Path to a JUCE 8 checkout")
 add_subdirectory(${JUCE_DIR} JUCE)
 
+# VST3 everywhere; AU for Logic/GarageBand on macOS; LV2 on Linux.
+if(APPLE)
+    set(FENIX_FORMATS VST3 AU)
+elseif(WIN32)
+    set(FENIX_FORMATS VST3)
+else()
+    set(FENIX_FORMATS VST3 LV2)
+endif()
+
 function(fenix_plugin target name code)
     juce_add_plugin(${target}
         COMPANY_NAME fenrikos
         PLUGIN_MANUFACTURER_CODE Fnrk
         PLUGIN_CODE ${code}
         PRODUCT_NAME "Fenix ${name}"
-        FORMATS VST3 LV2
+        FORMATS ${FENIX_FORMATS}
+        BUNDLE_ID "com.fenrikos.fenix.${target}"
+        HARDENED_RUNTIME_ENABLED TRUE
         LV2URI "https://github.com/FenrirRhogar/fenix/${target}"
         IS_SYNTH FALSE
         NEEDS_MIDI_INPUT FALSE
