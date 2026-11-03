@@ -57,6 +57,12 @@ cmake --build build -j
 The built plugins are copied to `~/.vst3` and `~/.lv2` automatically. Link-time optimisation is on by default;
 `-DFENIX_LTO=OFF` makes development builds link much faster.
 
+### Releasing
+
+`tools/build-portable.sh` builds the plugins inside an Ubuntu 22.04 container (needs Docker), so the binaries
+only require glibc 2.35 rather than whatever the build machine runs, then packages them with the docs in
+`packaging/` into `dist/Fenix-<version>-Linux-x64.zip`. `tools/store-art.py` turns 2x snapshots into store covers.
+
 ### Screenshots and paint benchmark
 
 `-DFENIX_SNAPSHOTS=ON` also builds a `<Plugin>_snapshot` tool for each plugin. It runs the editor against
