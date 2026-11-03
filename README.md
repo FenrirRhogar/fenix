@@ -89,6 +89,13 @@ tools/           editor snapshot tool
 
 ## Licence
 
-Fenix is **source-available, not open source**: the code is here to read and learn from, but all rights
-are reserved and builds may not be redistributed. Ready-made builds for Windows, macOS and Linux are sold
-separately. See [LICENSE](LICENSE) for the exact terms.
+Copyright (C) 2026 fenrikos.
+
+Fenix is free software: you can redistribute it and/or modify it under the terms of the
+[GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. It is distributed in the hope that it
+will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.
+
+Fenix uses [JUCE](https://juce.com) under the AGPLv3, the VST 3 SDK (MIT) and LV2 (ISC).
+Ready-made builds for Windows, macOS and Linux are available pay-what-you-want on Gumroad.
