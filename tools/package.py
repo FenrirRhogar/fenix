@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PLUGINS = ["Bus", "Drive", "Shelf", "HFComp", "Width", "Iron"]
 FORMATS = {"linux": ["VST3", "LV2"], "windows": ["VST3"], "macos": ["VST3", "AU"]}
+BUNDLE_SUFFIXES = {".vst3", ".component", ".lv2"}
 LABELS = {"linux": "Linux-x64", "windows": "Windows-x64", "macos": "macOS"}
 
 MAC_QUARANTINE = """
@@ -94,8 +95,10 @@ def main():
     for fmt in FORMATS[args.platform]:
         (stage / fmt).mkdir(parents=True)
         for plugin in PLUGINS:
+            # Only the bundles: on Windows the linker leaves .exp/.lib files next to them.
             for bundle in (build / f"{plugin}_artefacts" / "Release" / fmt).iterdir():
-                shutil.copytree(bundle, stage / fmt / bundle.name, symlinks=True)
+                if bundle.is_dir() and bundle.suffix in BUNDLE_SUFFIXES:
+                    shutil.copytree(bundle, stage / fmt / bundle.name, symlinks=True)
 
     values = {"VERSION": ver, "GLIBC": "", "MAC_QUARANTINE": "" if args.signed else MAC_QUARANTINE}
     if args.platform == "linux":
