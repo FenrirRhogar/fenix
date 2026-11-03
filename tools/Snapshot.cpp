@@ -7,6 +7,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <cstdio>
+
 namespace
 {
     // Kick, bass, hats and a wide pad: enough spectral and stereo content to drive every display.

@@ -29,7 +29,8 @@ namespace
         { "width_", "Width", width::accent() },
         { "iron_", "Iron", iron::accent() },
     };
-    constexpr size_t numStages = std::size (stages);
+    // sizeof, not std::size: older Apple Clang rejects std::size on a non-constexpr array here.
+    constexpr size_t numStages = sizeof (stages) / sizeof (stages[0]);
 }
 
 class BusProcessor final : public Processor

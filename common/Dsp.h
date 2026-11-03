@@ -6,6 +6,9 @@
 namespace fenix
 {
 
+// M_PI is not standard C++ and MSVC only defines it on request.
+constexpr double pi = 3.14159265358979323846;
+
 // RBJ cookbook biquad, transposed direct form II, up to two channels.
 // Coefficients are recomputed in place, so it is safe to retune on the audio thread.
 struct Biquad
@@ -19,7 +22,7 @@ struct Biquad
     void lowShelf (double fs, double f, double q, double gainDb)
     {
         const double A = std::pow (10.0, gainDb / 40.0), sA = std::sqrt (A);
-        const double w = 2.0 * M_PI * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+        const double w = 2.0 * pi * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
         set (A * ((A + 1) - (A - 1) * cs + 2 * sA * alpha),
              2 * A * ((A - 1) - (A + 1) * cs),
              A * ((A + 1) - (A - 1) * cs - 2 * sA * alpha),
@@ -31,7 +34,7 @@ struct Biquad
     void highShelf (double fs, double f, double q, double gainDb)
     {
         const double A = std::pow (10.0, gainDb / 40.0), sA = std::sqrt (A);
-        const double w = 2.0 * M_PI * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+        const double w = 2.0 * pi * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
         set (A * ((A + 1) + (A - 1) * cs + 2 * sA * alpha),
              -2 * A * ((A - 1) + (A + 1) * cs),
              A * ((A + 1) + (A - 1) * cs - 2 * sA * alpha),
@@ -43,13 +46,13 @@ struct Biquad
     void peak (double fs, double f, double q, double gainDb)
     {
         const double A = std::pow (10.0, gainDb / 40.0);
-        const double w = 2.0 * M_PI * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+        const double w = 2.0 * pi * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
         set (1 + alpha * A, -2 * cs, 1 - alpha * A, 1 + alpha / A, -2 * cs, 1 - alpha / A);
     }
 
     void lowpass (double fs, double f, double q)
     {
-        const double w = 2.0 * M_PI * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+        const double w = 2.0 * pi * f / fs, cs = std::cos (w), alpha = std::sin (w) / (2.0 * q);
         set ((1 - cs) / 2, 1 - cs, (1 - cs) / 2, 1 + alpha, -2 * cs, 1 - alpha);
     }
 
@@ -64,7 +67,7 @@ struct Biquad
     // Magnitude response in dB at `f`, for drawing EQ curves.
     float magnitudeDb (double f, double fs) const
     {
-        const auto z1inv = std::polar (1.0, -2.0 * M_PI * f / fs);
+        const auto z1inv = std::polar (1.0, -2.0 * pi * f / fs);
         const auto z2inv = z1inv * z1inv;
         const auto h = ((double) b0 + (double) b1 * z1inv + (double) b2 * z2inv)
                      / (1.0 + (double) a1 * z1inv + (double) a2 * z2inv);
@@ -90,7 +93,7 @@ struct DcBlocker
 {
     void prepare (double fs)
     {
-        r = (float) (1.0 - 2.0 * M_PI * 10.0 / fs);
+        r = (float) (1.0 - 2.0 * pi * 10.0 / fs);
         for (int ch = 0; ch < 2; ++ch)
             x1[ch] = y1[ch] = 0.0f;
     }
