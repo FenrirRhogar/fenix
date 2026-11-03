@@ -1,7 +1,8 @@
 // Renders a plugin's editor to PNG while feeding it a synthetic mix, so the meters and
 // displays show live content. Used for README screenshots and visual checks.
-//   <Plugin>_snapshot out.png [factoryPresetIndex] [--bench]
+//   <Plugin>_snapshot out.png [factoryPresetIndex] [--bench] [--scale N]
 // --bench also prints the average time to paint one full frame of the editor.
+// --scale renders at N times the editor's size (e.g. 2 for store artwork).
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -68,7 +69,18 @@ int main (int argc, char* argv[])
         juce::Thread::sleep (16);
     }
 
-    if (argc > 3 && juce::String (argv[3]) == "--bench")
+    bool bench = false;
+    float scale = 1.0f;
+    for (int i = 3; i < argc; ++i)
+    {
+        const juce::String arg (argv[i]);
+        if (arg == "--bench")
+            bench = true;
+        else if (arg == "--scale" && i + 1 < argc)
+            scale = juce::String (argv[++i]).getFloatValue();
+    }
+
+    if (bench)
     {
         constexpr int frames = 60;
         const auto start = juce::Time::getMillisecondCounterHiRes();
@@ -83,7 +95,7 @@ int main (int argc, char* argv[])
                      (juce::Time::getMillisecondCounterHiRes() - start) / frames);
     }
 
-    const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+    const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, scale);
     output.deleteFile();
     juce::FileOutputStream stream (output);
     juce::PNGImageFormat().writeImageToStream (image, stream);
