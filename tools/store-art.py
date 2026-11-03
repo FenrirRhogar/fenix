@@ -4,9 +4,10 @@
     tools/store-art.py <snapshots-dir> <out-dir>
 
 Expects bus.png, drive.png, shelf.png, hfcomp.png, width.png and iron.png rendered with
-`<Plugin>_snapshot <file> <preset> --scale 2`. Writes 1280x720 covers and a 600x600 thumbnail.
+`<Plugin>_snapshot <file> <preset> --scale 2`. Writes 1280x720 covers, a 600x600 thumbnail and a transparent logo.
 """
 
+import math
 import sys
 from pathlib import Path
 
@@ -64,24 +65,32 @@ def place_screenshot(canvas, shot, box_height, top):
     canvas.paste(shot, (x, top), mask)
 
 
-def flame(draw, x, y, w, h, colour):
-    """The Fenix mark as a polygon, sampled from the same cubic curves the plugins draw."""
-    segments = [
-        ((0.50, 0.00), (0.62, 0.28), (1.02, 0.42), (0.92, 0.74)),
-        ((0.92, 0.74), (0.86, 0.92), (0.70, 1.00), (0.50, 1.00)),
-        ((0.50, 1.00), (0.30, 1.00), (0.14, 0.92), (0.08, 0.74)),
-        ((0.08, 0.74), (0.00, 0.48), (0.22, 0.40), (0.30, 0.18)),
-        ((0.30, 0.18), (0.36, 0.38), (0.42, 0.46), (0.50, 0.50)),
-        ((0.50, 0.50), (0.52, 0.30), (0.46, 0.14), (0.50, 0.00)),
-    ]
-    points = []
-    for p0, p1, p2, p3 in segments:
-        for i in range(24):
-            t = i / 24
-            a, b, c, d = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3
-            points.append((x + w * (a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0]),
-                           y + h * (a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1])))
-    draw.polygon(points, fill=colour)
+def fehu(img, x, y, size):
+    """The Fenix mark: Fehu, the F rune, with the same geometry and gradient as the plugins.
+    Drawn as round-capped stroke polygons at 4x, then scaled down for clean edges."""
+    ss = 4
+    strokes = [((0.36, 0.10), (0.36, 0.90)), ((0.36, 0.40), (0.74, 0.12)), ((0.36, 0.64), (0.74, 0.36))]
+    r = 0.065 * size * ss
+    big = Image.new("L", (img.size[0] * ss, img.size[1] * ss), 0)
+    md = ImageDraw.Draw(big)
+    for (x0, y0), (x1, y1) in strokes:
+        ax, ay = (x + x0 * size) * ss, (y + y0 * size) * ss
+        bx, by = (x + x1 * size) * ss, (y + y1 * size) * ss
+        length = math.hypot(bx - ax, by - ay)
+        nx, ny = -(by - ay) / length * r, (bx - ax) / length * r
+        md.polygon([(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)], fill=255)
+        for cx, cy in ((ax, ay), (bx, by)):
+            md.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+    mask = big.resize(img.size, Image.LANCZOS)
+
+    top, bottom = (255, 196, 90), (232, 72, 48)
+    grad = Image.new("RGB", img.size)
+    gd = ImageDraw.Draw(grad)
+    y_top, y_bottom = y + 0.035 * size, y + 0.965 * size
+    for row in range(img.size[1]):
+        t = min(1.0, max(0.0, (row - y_top) / (y_bottom - y_top)))
+        gd.line([(0, row), (img.size[0], row)], fill=tuple(int(top[c] + (bottom[c] - top[c]) * t) for c in range(3)))
+    img.paste(grad, (0, 0), mask)
 
 
 def centred_text(draw, y, text, fnt, fill, width=W, spacing=0):
@@ -98,11 +107,11 @@ def centred_text(draw, y, text, fnt, fill, width=W, spacing=0):
 def hero(shots, out):
     accent = PLUGINS[0][3]
     img = background(W, H, accent)
+    fehu(img, int(W / 2 - 250), 30, 60)
     d = ImageDraw.Draw(img)
-    flame(d, W / 2 - 236, 34, 34, 50, (255, 196, 90))
     d.text((W / 2 - 190, 28), "FENIX", font=font("Black", 50), fill=TEXT)
     d.text((W / 2 + 6, 44), "COLOUR SUITE", font=font("Bold", 30), fill=accent)
-    centred_text(d, 100, "Six mix-bus colour plugins  ·  VST3 + LV2  ·  Linux", font("Medium", 22), DIM)
+    centred_text(d, 100, "Six mix-bus colour plugins  ·  Windows · macOS · Linux  ·  VST3 · AU · LV2", font("Medium", 22), DIM)
     place_screenshot(img, shots["bus"], 540, 158)
     img.save(out / "cover-1-suite.png", optimize=True)
 
@@ -120,11 +129,19 @@ def thumbnail(out):
     size = 600
     accent = PLUGINS[0][3]
     img = background(size, size, accent)
+    fehu(img, int(size / 2 - 0.55 * 230), 100, 230)
     d = ImageDraw.Draw(img)
-    flame(d, size / 2 - 70, 120, 140, 205, (255, 196, 90))
     centred_text(d, 352, "FENIX", font("Black", 92), TEXT, width=size, spacing=6)
     centred_text(d, 470, "COLOUR SUITE", font("Bold", 34), accent, width=size, spacing=3)
     img.save(out / "thumbnail.png", optimize=True)
+
+
+def logo(out):
+    """Transparent 1024 px mark, e.g. for the store profile picture."""
+    size = 1024
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    fehu(img, int(size * 0.05), int(size * 0.05), int(size * 0.9))
+    img.save(out / "logo.png", optimize=True)
 
 
 def main():
@@ -136,6 +153,7 @@ def main():
     for i, (key, name, tagline, accent) in enumerate(PLUGINS, start=2):
         plugin_cover(i, key, name, tagline, accent, shots[key], out)
     thumbnail(out)
+    logo(out)
 
 
 if __name__ == "__main__":
