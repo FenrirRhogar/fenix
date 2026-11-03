@@ -76,20 +76,34 @@ namespace draw
         g.drawRoundedRectangle (area.reduced (0.5f), corner, 1.0f);
     }
 
-    // Fenix mark: a stylised flame rising from a split base.
-    inline juce::Path flame (juce::Rectangle<float> b)
+    // Fenix mark: Fehu, the F rune. An upright stave with two branches rising to the right,
+    // drawn as round-capped strokes inside a square box.
+    inline juce::Path fehu (juce::Rectangle<float> box)
     {
-        juce::Path p;
-        const auto x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
-        p.startNewSubPath (x + w * 0.50f, y);
-        p.cubicTo (x + w * 0.62f, y + h * 0.28f, x + w * 1.02f, y + h * 0.42f, x + w * 0.92f, y + h * 0.74f);
-        p.cubicTo (x + w * 0.86f, y + h * 0.92f, x + w * 0.70f, y + h, x + w * 0.50f, y + h);
-        p.cubicTo (x + w * 0.30f, y + h, x + w * 0.14f, y + h * 0.92f, x + w * 0.08f, y + h * 0.74f);
-        p.cubicTo (x + w * 0.00f, y + h * 0.48f, x + w * 0.22f, y + h * 0.40f, x + w * 0.30f, y + h * 0.18f);
-        p.cubicTo (x + w * 0.36f, y + h * 0.38f, x + w * 0.42f, y + h * 0.46f, x + w * 0.50f, y + h * 0.50f);
-        p.cubicTo (x + w * 0.52f, y + h * 0.30f, x + w * 0.46f, y + h * 0.14f, x + w * 0.50f, y);
-        p.closeSubPath();
-        return p;
+        const auto size = juce::jmin (box.getWidth(), box.getHeight());
+        const auto at = [&] (float x, float y) { return juce::Point<float> (box.getX() + x * size, box.getY() + y * size); };
+
+        juce::Path lines;
+        for (auto [from, to] : { std::pair { at (0.36f, 0.10f), at (0.36f, 0.90f) },
+                                 { at (0.36f, 0.40f), at (0.74f, 0.12f) },
+                                 { at (0.36f, 0.64f), at (0.74f, 0.36f) } })
+        {
+            lines.startNewSubPath (from);
+            lines.lineTo (to);
+        }
+
+        juce::Path rune;
+        juce::PathStrokeType (0.13f * size, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded)
+            .createStrokedPath (rune, lines);
+        return rune;
+    }
+
+    // The mark's fixed brand gradient, amber to red, the same in every plugin.
+    inline void fillFehu (juce::Graphics& g, juce::Rectangle<float> box)
+    {
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffffc45a), box.getCentreX(), box.getY(),
+                                                 juce::Colour (0xffe84830), box.getCentreX(), box.getBottom(), false));
+        g.fillPath (fehu (box));
     }
 }
 

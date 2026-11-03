@@ -89,9 +89,7 @@ private:
         g.setColour (accent);
         g.fillRect (bounds.withHeight (2.0f));
 
-        const auto mark = draw::flame ({ 26.0f, 17.0f, 20.0f, 30.0f });
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffffd56b), 36.0f, 18.0f, accent.darker (0.3f), 36.0f, 47.0f, false));
-        g.fillPath (mark);
+        draw::fillFehu (g, { 16.0f, 16.0f, 34.0f, 34.0f });
 
         g.setFont (juce::FontOptions (23.0f, juce::Font::bold).withKerningFactor (0.2f));
         draw::engraved (g, "FENIX", { 56.0f, 14.0f, 110.0f, 26.0f }, juce::Justification::centredLeft);
