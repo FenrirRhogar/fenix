@@ -1,0 +1,6 @@
+FENIX COLOUR SUITE  -  CHANGELOG
+
+1.0.0
+- First release: Fenix Bus, Drive, Shelf EQ, HF Comp, Width and Iron, as VST3 and LV2 for Linux x86_64.
+- Factory presets for every plugin, plus user presets.
+- Click-free bypass in every plugin and per-stage switches in Fenix Bus.
