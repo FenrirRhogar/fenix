@@ -1,6 +1,7 @@
 # Fenix
 
-A suite of mix-bus colour processors by **fenrikos**, built with JUCE 8 as VST3 and LV2 plugins.
+A suite of mix-bus colour processors by **fenrikos**, built with JUCE 8 for Windows, macOS and Linux
+(VST3, AU on macOS, LV2 on Linux).
 There are five single-stage plugins, each with its own live display, VU metering and factory presets, and
 **Fenix Bus**, which runs all five stages in one chain with presets for the whole chain.
 
@@ -59,7 +60,11 @@ The built plugins are copied to `~/.vst3` and `~/.lv2` automatically. Link-time 
 
 ### Releasing
 
-`tools/build-portable.sh` builds the plugins inside an Ubuntu 22.04 container (needs Docker), so the binaries
+The **Release builds** GitHub Actions workflow (`.github/workflows/release.yml`) builds, validates (pluginval,
+plus auval for the AUs) and packages all three platforms; run it from the Actions tab and download the zips
+from the run. macOS builds are ad-hoc signed unless Developer ID secrets are configured (see the workflow file).
+
+For a local Linux release, `tools/build-portable.sh` builds the plugins inside an Ubuntu 22.04 container (needs Docker), so the binaries
 only require glibc 2.35 rather than whatever the build machine runs, then packages them with the docs in
 `packaging/` into `dist/Fenix-<version>-Linux-x64.zip`. `tools/store-art.py` turns 2x snapshots into store covers.
 
@@ -81,3 +86,9 @@ common/modules/  one header per stage: DSP, parameters, presets and display, sha
 plugins/         thin standalone wrappers, plus Bus.cpp (chain processor and its faceplate)
 tools/           editor snapshot tool
 ```
+
+## Licence
+
+Fenix is **source-available, not open source**: the code is here to read and learn from, but all rights
+are reserved and builds may not be redistributed. Ready-made builds for Windows, macOS and Linux are sold
+separately. See [LICENSE](LICENSE) for the exact terms.

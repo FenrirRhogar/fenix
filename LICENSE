@@ -1,0 +1,23 @@
+Fenix Colour Suite
+Copyright (c) 2026 fenrikos. All rights reserved.
+
+This repository is source-available, not open source. The code is published so that it can be
+read and studied.
+
+You may:
+  - read and study the source code;
+  - build it on your own computer to evaluate it or to learn from it. Builds made this way are for
+    your own private, non-commercial use and may not be shared.
+
+You may not, without written permission from the author:
+  - distribute this source code, or binaries built from it, whether modified or not;
+  - sell, sublicense or bundle it, or use it in any commercial product or service;
+  - publish modified versions or derivative works.
+
+Ready-made, validated builds for Windows, macOS and Linux are sold by the author; see README.md.
+
+Third-party components used by this project, including JUCE, the VST 3 SDK and LV2, remain under
+their own licences.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL
+THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
