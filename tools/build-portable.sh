@@ -13,4 +13,4 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$root:/src" -v "$juce:/juce:ro" -
     cmake -B build-portable -DCMAKE_BUILD_TYPE=Release -DJUCE_DIR=/juce -DFENIX_COPY_AFTER_BUILD=OFF -DFENIX_LTO=OFF &&
     cmake --build build-portable -j"$(nproc)"'
 
-JUCE_DIR="$juce" "$root/tools/package.sh" "$root/build-portable"
+python3 "$root/tools/package.py" linux "$root/build-portable" --juce "$juce"
