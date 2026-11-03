@@ -80,7 +80,14 @@ USING THE PLUGINS
 - Double-click any knob to reset it.
 
 
+LICENCE AND SOURCE
+------------------
+Copyright (C) 2026 fenrikos. Fenix is free software under the GNU Affero General Public License,
+version 3 or later (see LICENSE.txt). It comes with ABSOLUTELY NO WARRANTY.
+The complete source code is at https://github.com/FenrirRhogar/fenix
+
+
 SUPPORT
 -------
-Reply to your Gumroad receipt email with your system, host and what happened.
+Reply to your Gumroad receipt email, or open an issue on GitHub, with your system, host and what happened.
 Updates for version 1.x are free and appear in your Gumroad library.

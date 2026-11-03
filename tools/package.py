@@ -110,12 +110,12 @@ def main():
             (stage / script).chmod(0o755)
 
     (stage / "README.txt").write_text(render_readme(args.platform, values))
-    for doc in ("EULA.txt", "CHANGELOG.txt"):
-        shutil.copy(ROOT / "packaging" / doc, stage / doc)
+    shutil.copy(ROOT / "LICENSE", stage / "LICENSE.txt")
+    shutil.copy(ROOT / "packaging" / "CHANGELOG.txt", stage / "CHANGELOG.txt")
 
     sdk = juce_dir(build, args.juce) / "modules" / "juce_audio_processors_headless" / "format_types"
     notices = ["FENIX COLOUR SUITE - THIRD-PARTY NOTICES", "",
-               "Made with JUCE (https://juce.com), used under the JUCE 8 licence.", "",
+               "Made with JUCE (https://juce.com), used under the GNU AGPLv3.", "",
                "=== VST 3 SDK (Steinberg Media Technologies GmbH) ===",
                (sdk / "VST3_SDK" / "LICENSE.txt").read_text()]
     if args.platform == "linux":
