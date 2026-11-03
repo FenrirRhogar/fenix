@@ -240,6 +240,13 @@ public:
         if (auto xml = getXmlFromBinary (data, size))
             if (xml->hasTagName (apvts.state.getType()))
                 apvts.replaceState (juce::ValueTree::fromXml (*xml));
+
+        // A switch keeps whatever raw value the host last sent (0.7 still reads as "on"), and
+        // replaceState skips parameters whose on/off state is unchanged, so snap them to 0 or 1.
+        for (auto* raw : getParameters())
+            if (auto* toggle = dynamic_cast<juce::AudioParameterBool*> (raw))
+                if (const auto exact = toggle->get() ? 1.0f : 0.0f; std::abs (raw->getValue() - exact) > 1.0e-6f)
+                    toggle->setValueNotifyingHost (exact);
     }
 
 private:
