@@ -61,8 +61,9 @@ The built plugins are copied to `~/.vst3` and `~/.lv2` automatically. Link-time 
 ### Releasing
 
 The **Release builds** GitHub Actions workflow (`.github/workflows/release.yml`) builds, validates (pluginval,
-plus auval for the AUs) and packages all three platforms; run it from the Actions tab and download the zips
-from the run. macOS builds are ad-hoc signed unless Developer ID secrets are configured (see the workflow file).
+plus auval for the AUs) and packages all three platforms. Run it from the Actions tab to get the zips as run
+artifacts, or push a `v*` tag to also publish a GitHub Release with the zips and the matching section of
+`packaging/CHANGELOG.txt`. macOS builds are ad-hoc signed unless Developer ID secrets are configured (see the workflow file).
 
 For a local Linux release, `tools/build-portable.sh` builds the plugins inside an Ubuntu 22.04 container (needs Docker), so the binaries
 only require glibc 2.35 rather than whatever the build machine runs, then packages them with the docs in
@@ -98,4 +99,5 @@ will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of M
 FOR A PARTICULAR PURPOSE.
 
 Fenix uses [JUCE](https://juce.com) under the AGPLv3, the VST 3 SDK (MIT) and LV2 (ISC).
-Ready-made builds for Windows, macOS and Linux are available pay-what-you-want on Gumroad.
+Ready-made builds for Windows, macOS and Linux are on the [Releases](../../releases) page, and pay-what-you-want on
+[Gumroad](https://fenrikos.gumroad.com/l/fenix).
