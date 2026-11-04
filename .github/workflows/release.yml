@@ -1,6 +1,7 @@
 # Builds, validates and packages Fenix for Linux, Windows and macOS.
 # Run it from the Actions tab ("Run workflow") or by pushing a v* tag; each platform's zip is
-# attached to the run as an artifact.
+# attached to the run as an artifact. On a tag, it also publishes a GitHub Release with the three
+# zips and the matching CHANGELOG section as release notes.
 #
 # macOS signing and notarisation turn on when these repository secrets exist:
 #   MACOS_CERTIFICATE           base64 of the Developer ID Application .p12
@@ -138,3 +139,44 @@ jobs:
           name: Fenix-${{ matrix.name }}
           path: dist/*.zip
           retention-days: 3
+
+  # On a version tag (e.g. v1.0.0) publish a GitHub Release with the three zips.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the zips
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release notes from the CHANGELOG
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo "## Downloads"
+            echo
+            echo "| System | File |"
+            echo "|---|---|"
+            echo "| Windows 10/11 (64-bit) | \`Fenix-$version-Windows-x64.zip\`: VST3 |"
+            echo "| macOS 10.15+ (Apple Silicon and Intel) | \`Fenix-$version-macOS.zip\`: VST3 + AU |"
+            echo "| Linux x86_64 (glibc 2.35+) | \`Fenix-$version-Linux-x64.zip\`: VST3 + LV2 |"
+            echo
+            echo "Install steps are in the README inside each zip. You do not need the \"Source code\" archives."
+            echo
+            echo "## Changes"
+            awk -v v="$version" '$0 == v {found=1; next} found && /^[0-9]+\.[0-9]+/ {exit} found' packaging/CHANGELOG.txt
+          } > notes.md
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Fenix ${{ github.ref_name }}
+          files: dist/*.zip
+          body_path: notes.md
