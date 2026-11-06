@@ -368,26 +368,41 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto bounds = getLocalBounds().toFloat().reduced (1.0f, 0.0f).withTrimmedBottom (3.0f);
-        draw::card (g, bounds, 12.0f);
-
         const auto screen = bounds.reduced (6.0f);
         juce::Path screenShape;
         screenShape.addRoundedRectangle (screen, 8.0f);
-        g.setColour (colours::glass);
-        g.fillPath (screenShape);
+
+        // The card, glass and glow never change, and filling the glow live every frame is most
+        // of the cost of a frame, so they are rendered once per size and display scale.
+        const float scale = g.getInternalContext().getPhysicalPixelScaleFactor();
+        if (background.isNull() || scale != backgroundScale)
+        {
+            backgroundScale = scale;
+            background = juce::Image (juce::Image::ARGB, juce::jmax (1, juce::roundToInt ((float) getWidth() * scale)),
+                                      juce::jmax (1, juce::roundToInt ((float) getHeight() * scale)), true);
+            juce::Graphics bg (background);
+            bg.addTransform (juce::AffineTransform::scale (scale));
+            draw::card (bg, bounds, 12.0f);
+            bg.setColour (colours::glass);
+            bg.fillPath (screenShape);
+            bg.reduceClipRegion (screenShape);
+            bg.setGradientFill (juce::ColourGradient (accent.withAlpha (0.13f), screen.getCentreX(), screen.getBottom(),
+                                                      accent.withAlpha (0.0f), screen.getCentreX(), screen.getY(), true));
+            bg.fillRect (screen);
+        }
+        g.drawImage (background, getLocalBounds().toFloat());
 
         {
             const juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (screenShape);
-            g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.13f), screen.getCentreX(), screen.getBottom(),
-                                                     accent.withAlpha (0.0f), screen.getCentreX(), screen.getY(), true));
-            g.fillRect (screen);
             drawContent (g, screen.reduced (10.0f, 8.0f));
         }
 
         g.setColour (colours::cardEdge);
         g.strokePath (screenShape, juce::PathStrokeType (1.0f));
     }
+
+    void resized() override { background = {}; }
 
 protected:
     virtual void onSamples (const float*, const float*, int) {}
@@ -412,6 +427,8 @@ protected:
 private:
     juce::String prefix;
     std::array<float, ScopeFifo::capacity> left {}, right {};
+    juce::Image background;
+    float backgroundScale = 0.0f;
 };
 
 //==============================================================================
