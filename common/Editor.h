@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PresetBar.h"
+#include "UpdateCheck.h"
 #include "Widgets.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -29,6 +30,7 @@ public:
         rightMeter = std::make_unique<VuMeter> ("OUTPUT", VuMeter::Mode::level, [&p] { return p.outputRms.load(); }, p.accent());
         addAndMakeVisible (*leftMeter);
         addAndMakeVisible (*rightMeter);
+        addAndMakeVisible (updateBadge);
     }
 
     ~EditorBase() override { setLookAndFeel (nullptr); }
@@ -38,6 +40,7 @@ public:
     void resized() override
     {
         power.setBounds (getWidth() - 68, 21, 46, 24);
+        updateBadge.setBounds (24, getHeight() - 24, getWidth() / 2, 24);
         presetBar.setBounds (getWidth() - 480, 19, 390, 28);
         layout();
 
@@ -107,8 +110,6 @@ private:
         g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.25f));
         g.setColour (colours::engraveDim.withAlpha (0.8f));
         g.drawText ("FENRIKOS", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedRight (24.0f), juce::Justification::centredRight);
-        g.setColour (colours::engraveDim.withAlpha (0.45f));
-        g.drawText ("FENIX COLOUR SERIES", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedLeft (24.0f), juce::Justification::centredLeft);
     }
 
     void timerCallback() override
@@ -124,6 +125,11 @@ private:
 
     PowerButton power;
     PresetBar presetBar;
+
+    // "FENIX COLOUR SERIES · V1.0.0" in the footer; says so when an update is out.
+    fenrikos::UpdateBadge updateBadge { juce::String (juce::CharPointer_UTF8 ("FENIX COLOUR SERIES  \xc2\xb7  V")) + JucePlugin_VersionString,
+                                        juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.25f),
+                                        colours::engraveDim.withAlpha (0.45f), proc.accent(), juce::Justification::centredLeft };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> powerAttachment;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> attachments;
     juce::Image background;
