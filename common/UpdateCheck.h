@@ -44,7 +44,15 @@ public:
 
     ~UpdateCheck() override
     {
-        stopThread (6000);   // the request times out after 5 s
+        // Abort a request still in flight, so closing the plugin window neither waits for the
+        // network nor leaves JUCE to kill the thread by force inside libcurl.
+        signalThreadShouldExit();
+        {
+            const juce::ScopedLock sl (lock);
+            if (request != nullptr)
+                request->cancel();
+        }
+        stopThread (10000);
         cancelPendingUpdate();
     }
 
@@ -93,22 +101,27 @@ private:
     void run() override
     {
         const juce::URL url ("https://api.github.com/repos/FenrirRhogar/" FENRIKOS_UPDATE_REPO "/releases/latest");
-        auto stream = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                                                 .withConnectionTimeoutMs (5000)
-                                                 .withExtraHeaders ("User-Agent: fenrikos-update-check\r\n"
-                                                                    "Accept: application/vnd.github+json"));
-        if (stream == nullptr || threadShouldExit())
-            return;
-
-        const auto tag = juce::JSON::parse (stream->readEntireStreamAsString())
-                             .getProperty ("tag_name", {}).toString().trimCharactersAtStart ("vV");
-        if (tag.isEmpty())
-            return;
-
+        juce::WebInputStream stream (url, false);
+        stream.withConnectionTimeout (5000)
+              .withExtraHeaders ("User-Agent: fenrikos-update-check\r\nAccept: application/vnd.github+json");
         {
             const juce::ScopedLock sl (lock);
-            fetched = tag;
+            if (threadShouldExit())
+                return;
+            request = &stream;   // the destructor cancels it from the message thread
         }
+
+        juce::String body;
+        if (stream.connect (nullptr) && stream.getStatusCode() == 200)
+            body = stream.readEntireStreamAsString();
+
+        const juce::ScopedLock sl (lock);
+        request = nullptr;
+        const auto tag = juce::JSON::parse (body).getProperty ("tag_name", {}).toString().trimCharactersAtStart ("vV");
+        if (threadShouldExit() || tag.isEmpty())
+            return;
+
+        fetched = tag;
         triggerAsyncUpdate();
     }
 
@@ -126,6 +139,7 @@ private:
 
     std::unique_ptr<juce::PropertiesFile> settings;
     juce::String latest, fetched;
+    juce::WebInputStream* request = nullptr;   // the request in flight, guarded by `lock`
     juce::CriticalSection lock;
 };
 
