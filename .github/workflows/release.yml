@@ -30,7 +30,7 @@ jobs:
         include:
           - { name: Linux, os: ubuntu-22.04, platform: linux, pluginval: pluginval_Linux.zip }
           - { name: Windows, os: windows-2022, platform: windows, pluginval: pluginval_Windows.zip }
-          - { name: macOS, os: macos-14, platform: macos, pluginval: pluginval_macOS.zip }
+          - { name: macOS, os: macos-15, platform: macos, pluginval: pluginval_macOS.zip }
     env:
       SIGN_MACOS: ${{ secrets.MACOS_CERTIFICATE != '' }}
     defaults:
