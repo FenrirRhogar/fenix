@@ -39,7 +39,11 @@ function(fenix_plugin target name code)
     target_include_directories(${target} PRIVATE common)
     target_compile_definitions(${target} PUBLIC
         JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
+        JUCE_USE_CURL=1                       # update check (UpdateCheck.h); on Linux libcurl is
+        JUCE_LOAD_CURL_SYMBOLS_LAZILY=1       # loaded at run time, so it is not a hard dependency
+        FENRIKOS_UPDATE_REPO="fenix"
+        FENRIKOS_UPDATE_NAME="Fenix"
+        FENRIKOS_PRODUCT_URL="https://fenrikos.gumroad.com/l/fenix"
         JUCE_VST3_CAN_REPLACE_VST2=0)
     target_link_libraries(${target}
         PRIVATE juce::juce_audio_utils juce::juce_dsp
