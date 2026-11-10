@@ -47,21 +47,23 @@ private:
     public:
         explicit NameButton (juce::Colour a) : Button ({}), accent (a) {}
 
-        void paintButton (juce::Graphics& g, bool over, bool down) override
+        // Recessed display window with the preset name lit in the plugin's colour.
+        void paintButton (juce::Graphics& g, bool over, bool) override
         {
-            const auto area = getLocalBounds().toFloat().reduced (0.5f);
-            const auto corner = area.getHeight() * 0.5f;
-            g.setColour (colours::lcd.brighter (down ? 0.15f : (over ? 0.08f : 0.0f)));
-            g.fillRoundedRectangle (area, corner);
-            g.setColour (over ? accent.withAlpha (0.5f) : juce::Colours::white.withAlpha (0.08f));
-            g.drawRoundedRectangle (area, corner, 1.0f);
+            const auto area = getLocalBounds().toFloat().reduced (1.5f);
+            draw::recess (g, area, 3.0f, colours::lcd);
+            g.setColour (accent.withAlpha (over ? 0.08f : 0.04f));
+            g.fillRoundedRectangle (area, 3.0f);
 
-            g.setColour (accent.brighter (0.3f));
-            g.setFont (draw::font (13.5f));
-            g.drawText (getButtonText(), area.withTrimmedLeft (14.0f).withTrimmedRight (28.0f), juce::Justification::centredLeft, true);
+            const auto text = area.withTrimmedLeft (12.0f).withTrimmedRight (28.0f);
+            g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::bold));
+            g.setColour (accent.withAlpha (0.25f));
+            g.drawText (getButtonText().toUpperCase(), text.translated (0.0f, 0.5f).expanded (0.5f), juce::Justification::centredLeft, true);
+            g.setColour (accent.brighter (0.4f));
+            g.drawText (getButtonText().toUpperCase(), text, juce::Justification::centredLeft, true);
 
             juce::Path caret;
-            const auto cx = area.getRight() - 16.0f, cy = area.getCentreY();
+            const auto cx = area.getRight() - 15.0f, cy = area.getCentreY();
             caret.startNewSubPath (cx - 4.0f, cy - 2.0f);
             caret.lineTo (cx, cy + 2.0f);
             caret.lineTo (cx + 4.0f, cy - 2.0f);

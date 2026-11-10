@@ -7,16 +7,19 @@ namespace fenix
 
 namespace colours
 {
-    const juce::Colour plateTop { 0xff1e2127 };
-    const juce::Colour plateBottom { 0xff131519 };
-    const juce::Colour card { 0xff1a1d22 };
-    const juce::Colour cardEdge { 0x10ffffff };
-    const juce::Colour glass { 0xff0c0e11 };
-    const juce::Colour engrave { 0xffe2e5ea };
-    const juce::Colour engraveDim { 0xff868c97 };
-    const juce::Colour tickOff { 0xff2f333b };
-    const juce::Colour lcd { 0xff101216 };
-    const juce::Colour button { 0xff252930 };
+    // Rack faceplate: black anodised aluminium with cream silkscreen legends.
+    const juce::Colour plateTop { 0xff2b2d31 };
+    const juce::Colour plateBottom { 0xff1d1f22 };
+    const juce::Colour card { 0xff222428 };
+    const juce::Colour cardEdge { 0x14ffffff };
+    const juce::Colour glass { 0xff08090b };
+    const juce::Colour engrave { 0xffeae4d3 };     // silkscreen
+    const juce::Colour engraveDim { 0xff9c978a };  // dim silkscreen
+    const juce::Colour tickOff { 0xff3a3c41 };
+    const juce::Colour lcd { 0xff0b0c0a };
+    const juce::Colour button { 0xff2e3035 };
+    const juce::Colour metalLight { 0xffd9dadc };
+    const juce::Colour metalDark { 0xff8d9095 };
 }
 
 namespace draw
@@ -31,11 +34,11 @@ namespace draw
         return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), height, juce::Font::plain);
     }
 
-    // Panel label text with a faint drop shadow so it stays crisp on gradients.
+    // Silkscreen legend: printed ink sits on the metal, so only a hairline of shadow.
     inline void engraved (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> area,
                           juce::Justification just, juce::Colour colour = colours::engrave)
     {
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
         g.drawText (text, area.translated (0.0f, 1.0f), just, false);
         g.setColour (colour);
         g.drawText (text, area, just, false);
@@ -50,30 +53,149 @@ namespace draw
         g.strokePath (path, juce::PathStrokeType (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
-    // A lit dot with halo.
+    // Panel LED in a chrome bezel: a domed lens that glows when lit and reads as dark glass when off.
     inline void led (juce::Graphics& g, juce::Point<float> centre, float radius, juce::Colour colour, bool on)
     {
+        const auto bezel = juce::Rectangle<float> (radius * 2.0f + 3.0f, radius * 2.0f + 3.0f).withCentre (centre);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff15161a), bezel.getCentreX(), bezel.getY(),
+                                                 juce::Colour (0xff6a6d73), bezel.getCentreX(), bezel.getBottom(), false));
+        g.fillEllipse (bezel);
+
         if (on)
         {
-            g.setGradientFill (juce::ColourGradient (colour.withAlpha (0.45f), centre, colour.withAlpha (0.0f),
-                                                     centre.translated (radius * 3.5f, 0.0f), true));
-            g.fillEllipse (juce::Rectangle<float> (radius * 7.0f, radius * 7.0f).withCentre (centre));
+            g.setGradientFill (juce::ColourGradient (colour.withAlpha (0.5f), centre, colour.withAlpha (0.0f),
+                                                     centre.translated (radius * 3.8f, 0.0f), true));
+            g.fillEllipse (juce::Rectangle<float> (radius * 7.6f, radius * 7.6f).withCentre (centre));
         }
-        const auto body = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
-        g.setColour (on ? colour.brighter (0.4f) : colour.darker (2.5f).withAlpha (0.8f));
-        g.fillEllipse (body);
+
+        const auto lens = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
+        const auto core = on ? colour.brighter (0.5f) : colour.darker (2.2f);
+        g.setGradientFill (juce::ColourGradient (on ? juce::Colours::white.interpolatedWith (colour, 0.35f) : colour.darker (1.2f),
+                                                 centre.x - radius * 0.3f, centre.y - radius * 0.35f,
+                                                 on ? colour : core.darker (0.6f), centre.x + radius, centre.y + radius, true));
+        g.fillEllipse (lens);
+        g.setColour (juce::Colours::white.withAlpha (on ? 0.7f : 0.22f));
+        g.fillEllipse (juce::Rectangle<float> (radius * 0.7f, radius * 0.45f).withCentre (centre.translated (-radius * 0.25f, -radius * 0.45f)));
     }
 
-    // Raised card: soft shadow, slightly lighter top edge and a hairline border.
+    // Brushed aluminium: a vertical light falloff plus fine horizontal grain. Deterministic, so the
+    // texture never shimmers between redraws. Only ever drawn into cached background images.
+    inline void brushedMetal (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour top, juce::Colour bottom, int seed = 7)
+    {
+        g.setGradientFill (juce::ColourGradient (top, area.getX(), area.getY(), bottom, area.getX(), area.getBottom(), false));
+        g.fillRect (area);
+
+        juce::Random random (seed);
+        const auto lines = (int) (area.getHeight() * 2.2f);
+        for (int i = 0; i < lines; ++i)
+        {
+            const auto y = area.getY() + random.nextFloat() * area.getHeight();
+            const auto x = area.getX() + random.nextFloat() * area.getWidth() * 0.9f - area.getWidth() * 0.2f;
+            const auto len = area.getWidth() * (0.2f + random.nextFloat() * 0.8f);
+            const bool light = random.nextBool();
+            g.setColour ((light ? juce::Colours::white : juce::Colours::black).withAlpha (0.012f + random.nextFloat() * (light ? 0.025f : 0.05f)));
+            g.fillRect (juce::Rectangle<float> (x, y, len, random.nextFloat() < 0.15f ? 1.0f : 0.5f).getIntersection (area));
+        }
+
+        // Broad sheen across the plate, as if lit from above-left.
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.045f), area.getX(), area.getY(),
+                                                 juce::Colours::white.withAlpha (0.0f), area.getCentreX(), area.getBottom(), false));
+        g.fillRect (area);
+    }
+
+    // Recessed cut-out: dark top edge in shadow, a lit lip along the bottom.
+    inline void recess (juce::Graphics& g, juce::Rectangle<float> area, float corner, juce::Colour fill = colours::glass)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.09f));
+        g.fillRoundedRectangle (area.translated (0.0f, 1.0f).expanded (1.0f), corner + 1.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.85f));
+        g.fillRoundedRectangle (area.expanded (1.0f), corner + 1.0f);
+        g.setColour (fill);
+        g.fillRoundedRectangle (area, corner);
+
+        // Inner shadow falling from the top lip.
+        const juce::Graphics::ScopedSaveState save (g);
+        juce::Path shape;
+        shape.addRoundedRectangle (area, corner);
+        g.reduceClipRegion (shape);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.6f), 0.0f, area.getY(),
+                                                 juce::Colours::black.withAlpha (0.0f), 0.0f, area.getY() + 10.0f, false));
+        g.fillRect (area.withHeight (10.0f));
+    }
+
+    // Raised black bezel around a meter or screen: bevelled ring with a lit top edge.
+    inline void bezel (juce::Graphics& g, juce::Rectangle<float> area, float corner)
+    {
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.fillRoundedRectangle (area.translated (0.0f, 3.0f).expanded (1.5f), corner + 1.5f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3d4045), 0.0f, area.getY(),
+                                                 juce::Colour (0xff111214), 0.0f, area.getBottom(), false));
+        g.fillRoundedRectangle (area, corner);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff1e2023), 0.0f, area.getY(),
+                                                 juce::Colour (0xff2a2c30), 0.0f, area.getBottom(), false));
+        g.fillRoundedRectangle (area.reduced (2.0f), juce::jmax (0.0f, corner - 2.0f));
+        g.setColour (juce::Colours::white.withAlpha (0.14f));
+        g.drawLine (area.getX() + corner, area.getY() + 0.5f, area.getRight() - corner, area.getY() + 0.5f, 1.0f);
+    }
+
+    // Phillips-head screw, countersunk into the plate.
+    inline void screw (juce::Graphics& g, juce::Point<float> centre, float radius, float angle = 0.6f)
+    {
+        const auto head = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.fillEllipse (head.expanded (1.5f).translated (0.0f, 1.0f));
+        g.setGradientFill (juce::ColourGradient (colours::metalLight, head.getX(), head.getY(),
+                                                 juce::Colour (0xff55585e), head.getRight(), head.getBottom(), false));
+        g.fillEllipse (head);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff7d8086), head.getX(), head.getY(),
+                                                 juce::Colour (0xffc4c6ca), head.getRight(), head.getBottom(), false));
+        g.fillEllipse (head.reduced (radius * 0.18f));
+
+        juce::Path cross;
+        const auto arm = radius * 0.55f;
+        for (int k = 0; k < 2; ++k)
+        {
+            const auto a = angle + (float) k * juce::MathConstants<float>::halfPi;
+            const auto d = juce::Point<float> (std::cos (a), std::sin (a)) * arm;
+            cross.startNewSubPath (centre - d);
+            cross.lineTo (centre + d);
+        }
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.strokePath (cross, juce::PathStrokeType (radius * 0.28f), juce::AffineTransform::translation (0.4f, 0.6f));
+        g.setColour (juce::Colour (0xff2a2c30));
+        g.strokePath (cross, juce::PathStrokeType (radius * 0.28f));
+    }
+
+    // Machined seam across the plate: a dark groove with a lit lower lip.
+    inline void seam (juce::Graphics& g, float x1, float x2, float y)
+    {
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.fillRect (x1, y, x2 - x1, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.07f));
+        g.fillRect (x1, y + 1.0f, x2 - x1, 1.0f);
+    }
+
+    // Silkscreened section outline, with the title printed in a gap in the top rule.
+    inline void silkBox (juce::Graphics& g, juce::Rectangle<float> area, const juce::String& title, juce::Colour titleColour, float corner = 6.0f)
+    {
+        g.setFont (juce::FontOptions (11.5f, juce::Font::bold).withKerningFactor (0.18f));
+        const auto textWidth = title.isEmpty() ? 0.0f : juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), title) + 14.0f;
+        {
+            const juce::Graphics::ScopedSaveState save (g);
+            if (textWidth > 0.0f)
+                g.excludeClipRegion (juce::Rectangle<float> (area.getX() + 14.0f, area.getY() - 8.0f, textWidth, 16.0f).toNearestInt());
+            g.setColour (colours::engrave.withAlpha (0.38f));
+            g.drawRoundedRectangle (area, corner, 1.0f);
+        }
+        if (textWidth > 0.0f)
+            engraved (g, title, { area.getX() + 21.0f, area.getY() - 8.0f, textWidth, 16.0f }, juce::Justification::centredLeft, titleColour);
+    }
+
+    // Raised panel the old Fenix code calls a card; on the rack plate it is a silkscreened outline.
     inline void card (juce::Graphics& g, juce::Rectangle<float> area, float corner = 12.0f)
     {
-        g.setColour (juce::Colours::black.withAlpha (0.28f));
-        g.fillRoundedRectangle (area.translated (0.0f, 3.0f).expanded (1.0f), corner + 1.0f);
-        g.setGradientFill (juce::ColourGradient (colours::card.brighter (0.07f), area.getTopLeft(),
-                                                 colours::card, area.getBottomLeft(), false));
-        g.fillRoundedRectangle (area, corner);
-        g.setColour (colours::cardEdge);
-        g.drawRoundedRectangle (area.reduced (0.5f), corner, 1.0f);
+        juce::ignoreUnused (corner);
+        silkBox (g, area, {}, colours::engrave);
     }
 
     // Fenix mark: Fehu, the F rune. An upright stave with two branches rising to the right,
@@ -145,14 +267,19 @@ public:
         g.drawRect (0, 0, width, height);
     }
 
+    // Small machined push button: raised dark cap with a lit top edge; it sinks when pressed.
     void drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool over, bool down) override
     {
-        const auto area = b.getLocalBounds().toFloat().reduced (0.5f);
-        const auto corner = juce::jmin (8.0f, area.getHeight() * 0.5f);
-        g.setColour (colours::button.brighter (down ? 0.02f : (over ? 0.12f : 0.0f)));
-        g.fillRoundedRectangle (area, corner);
-        g.setColour (over ? accent.withAlpha (0.45f) : colours::cardEdge);
-        g.drawRoundedRectangle (area, corner, 1.0f);
+        auto area = b.getLocalBounds().toFloat().reduced (1.0f, 1.5f);
+        g.setColour (juce::Colours::black.withAlpha (0.7f));
+        g.fillRoundedRectangle (area.translated (0.0f, 1.5f), 3.5f);
+        if (down)
+            area.translate (0.0f, 1.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (over ? 0xff4a4d53 : 0xff404349), 0.0f, area.getY(),
+                                                 juce::Colour (0xff222428), 0.0f, area.getBottom(), false));
+        g.fillRoundedRectangle (area, 3.0f);
+        g.setColour (juce::Colours::white.withAlpha (down ? 0.05f : 0.16f));
+        g.drawLine (area.getX() + 3.0f, area.getY() + 0.5f, area.getRight() - 3.0f, area.getY() + 0.5f, 1.0f);
     }
 
     juce::Font getTextButtonFont (juce::TextButton&, int) override

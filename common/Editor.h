@@ -37,11 +37,15 @@ public:
 
     void paint (juce::Graphics& g) override { g.drawImageAt (background, 0, 0); }
 
+    // Width of each rack ear; the plate between them holds the controls.
+    static constexpr int ear = 34;
+
     void resized() override
     {
-        power.setBounds (getWidth() - 68, 21, 46, 24);
-        updateBadge.setBounds (24, getHeight() - 24, getWidth() / 2, 24);
-        presetBar.setBounds (getWidth() - 480, 19, 390, 28);
+        const auto right = getWidth() - ear;
+        power.setBounds (right - 70, 20, 50, 28);
+        updateBadge.setBounds (ear + 24, getHeight() - 24, getWidth() / 2, 24);
+        presetBar.setBounds (right - 486, 20, 396, 28);
         layout();
 
         background = juce::Image (juce::Image::RGB, getWidth(), getHeight(), false);
@@ -56,9 +60,10 @@ protected:
     virtual void tick() {}
 
     // Call at the end of the subclass constructor, once every child exists.
+    // `width` is the plate's width; the rack ears are added either side.
     void start (int width, int height)
     {
-        setSize (width, height);
+        setSize (width + 2 * ear, height);
         startTimerHz (60);
     }
 
@@ -72,6 +77,9 @@ protected:
         return knob;
     }
 
+    // The faceplate between the ears; layouts work inside this.
+    juce::Rectangle<int> plate() const { return getLocalBounds().reduced (ear, 0); }
+
     Processor& proc;
     LookAndFeel lnf;
     std::vector<std::unique_ptr<Knob>> knobs;
@@ -81,35 +89,54 @@ private:
     void paintFaceplate (juce::Graphics& g)
     {
         const auto bounds = getLocalBounds().toFloat();
+        const auto face = plate().toFloat();
         const auto accent = proc.accent();
-        g.setGradientFill (juce::ColourGradient (colours::plateTop, 0.0f, 0.0f, colours::plateBottom, 0.0f, bounds.getBottom(), false));
-        g.fillAll();
 
-        // Soft accent glow from the top edge: the plugin's colour identity.
-        g.setGradientFill (juce::ColourGradient (accent.withAlpha (0.16f), bounds.getCentreX(), 0.0f,
-                                                 accent.withAlpha (0.0f), bounds.getCentreX(), 90.0f, false));
-        g.fillRect (bounds.withHeight (90.0f));
-        g.setColour (accent);
-        g.fillRect (bounds.withHeight (2.0f));
+        draw::brushedMetal (g, bounds, colours::plateTop, colours::plateBottom);
 
-        draw::fillFehu (g, { 16.0f, 16.0f, 34.0f, 34.0f });
+        // Rack ears: a fold in the metal either side, each with two slotted mounting screws.
+        for (auto earArea : { bounds.withWidth ((float) ear), bounds.withLeft (bounds.getRight() - (float) ear) })
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.18f));
+            g.fillRect (earArea);
+            const bool left = earArea.getX() == 0.0f;
+            const auto foldX = left ? earArea.getRight() : earArea.getX();
+            g.setColour (juce::Colours::black.withAlpha (0.6f));
+            g.fillRect (foldX - (left ? 1.0f : 0.0f), 0.0f, 1.0f, bounds.getHeight());
+            g.setColour (juce::Colours::white.withAlpha (0.08f));
+            g.fillRect (foldX + (left ? 0.0f : -1.0f), 0.0f, 1.0f, bounds.getHeight());
 
-        g.setFont (juce::FontOptions (23.0f, juce::Font::bold).withKerningFactor (0.2f));
-        draw::engraved (g, "FENIX", { 56.0f, 14.0f, 110.0f, 26.0f }, juce::Justification::centredLeft);
-        g.setFont (juce::FontOptions (15.0f, juce::Font::bold).withKerningFactor (0.14f));
-        g.setColour (accent.brighter (0.25f));
-        g.drawText (proc.getName().fromFirstOccurrenceOf ("Fenix ", false, false).toUpperCase(),
-                    juce::Rectangle<float> (160.0f, 18.0f, 220.0f, 20.0f), juce::Justification::centredLeft);
-        g.setFont (draw::font (11.5f));
+            for (auto y : { 46.0f, bounds.getHeight() - 46.0f })
+            {
+                const auto slot = juce::Rectangle<float> (13.0f, 24.0f).withCentre ({ earArea.getCentreX(), y });
+                draw::recess (g, slot, 6.5f, juce::Colour (0xff050506));
+                draw::screw (g, { slot.getCentreX(), slot.getCentreY() + 3.0f }, 6.0f, y < 100.0f ? 0.4f : 1.1f);
+            }
+        }
+
+        // Top and bottom edges of the plate catch the light.
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.fillRect (bounds.withHeight (1.0f));
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.fillRect (bounds.withTop (bounds.getBottom() - 1.0f));
+
+        // Nameplate: the rune and model name silkscreened at the top left.
+        const auto x = face.getX();
+        draw::fillFehu (g, { x + 16.0f, 16.0f, 34.0f, 34.0f });
+        g.setFont (juce::FontOptions (24.0f, juce::Font::bold).withKerningFactor (0.28f));
+        draw::engraved (g, "FENIX", { x + 56.0f, 13.0f, 120.0f, 26.0f }, juce::Justification::centredLeft);
+        g.setFont (juce::FontOptions (14.0f, juce::Font::bold).withKerningFactor (0.2f));
+        draw::engraved (g, proc.getName().fromFirstOccurrenceOf ("Fenix ", false, false).toUpperCase(),
+                        { x + 168.0f, 18.0f, 220.0f, 20.0f }, juce::Justification::centredLeft, accent.brighter (0.2f));
+        g.setFont (juce::FontOptions (10.5f, juce::Font::plain).withKerningFactor (0.08f));
         g.setColour (colours::engraveDim);
-        g.drawText (proc.tagline(), juce::Rectangle<float> (57.0f, 40.0f, 300.0f, 14.0f), juce::Justification::centredLeft);
+        g.drawText (proc.tagline().toUpperCase(), juce::Rectangle<float> (x + 57.0f, 40.0f, 320.0f, 14.0f), juce::Justification::centredLeft);
 
-        g.setColour (colours::cardEdge);
-        g.fillRect (20.0f, 66.0f, bounds.getWidth() - 40.0f, 1.0f);
+        draw::seam (g, face.getX() + 16.0f, face.getRight() - 16.0f, 66.0f);
 
-        g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.25f));
-        g.setColour (colours::engraveDim.withAlpha (0.8f));
-        g.drawText ("FENRIKOS", bounds.withTop (bounds.getBottom() - 24.0f).withTrimmedRight (24.0f), juce::Justification::centredRight);
+        g.setFont (juce::FontOptions (10.0f, juce::Font::bold).withKerningFactor (0.3f));
+        g.setColour (colours::engraveDim);
+        g.drawText ("FENRIKOS", face.withTop (bounds.getBottom() - 24.0f).withTrimmedRight (24.0f), juce::Justification::centredRight);
     }
 
     void timerCallback() override
@@ -162,11 +189,12 @@ protected:
     void layout() override
     {
         const int meterWidth = 176, top = 82, mainHeight = 200;
-        leftMeter->setBounds (20, top, meterWidth, mainHeight);
-        rightMeter->setBounds (getWidth() - 20 - meterWidth, top, meterWidth, mainHeight);
-        display->setBounds (20 + meterWidth + 14, top, getWidth() - 2 * (20 + meterWidth + 14), mainHeight);
+        const auto area = plate().reduced (20, 0);
+        leftMeter->setBounds (area.getX(), top, meterWidth, mainHeight);
+        rightMeter->setBounds (area.getRight() - meterWidth, top, meterWidth, mainHeight);
+        display->setBounds (area.getX() + meterWidth + 14, top, area.getWidth() - 2 * (meterWidth + 14), mainHeight);
 
-        knobPanel = { 20, top + mainHeight + 16, getWidth() - 40, getHeight() - (top + mainHeight + 16) - 30 };
+        knobPanel = { area.getX(), top + mainHeight + 22, area.getWidth(), getHeight() - (top + mainHeight + 22) - 30 };
 
         // Main knobs get wide cells, mix/output trims narrower ones; the group is centred.
         int total = 0;

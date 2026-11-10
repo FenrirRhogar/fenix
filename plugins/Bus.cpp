@@ -179,18 +179,28 @@ class StageTab : public juce::Button
 public:
     StageTab() : Button ({}) {}
 
-    void paintButton (juce::Graphics& g, bool over, bool) override
+    // Hardware selector button with an LED for the stage's IN state; the selected one stays latched down.
+    void paintButton (juce::Graphics& g, bool over, bool down) override
     {
-        const auto area = getLocalBounds().toFloat().reduced (1.0f);
-        const auto corner = area.getHeight() * 0.5f;
-        g.setColour (selected ? colour.withAlpha (0.2f) : colours::button.brighter (over ? 0.1f : 0.0f));
-        g.fillRoundedRectangle (area, corner);
-        g.setColour (selected ? colour.withAlpha (0.8f) : colours::cardEdge);
-        g.drawRoundedRectangle (area, corner, 1.0f);
+        auto area = getLocalBounds().toFloat().reduced (1.0f, 1.5f);
+        g.setColour (juce::Colours::black.withAlpha (0.75f));
+        g.fillRoundedRectangle (area.translated (0.0f, 1.5f), 3.5f);
+        if (selected || down)
+            area.translate (0.0f, 1.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (selected ? 0xff2a2c30 : (over ? 0xff4a4d53 : 0xff404349)), 0.0f, area.getY(),
+                                                 juce::Colour (selected ? 0xff1b1c1f : 0xff222428), 0.0f, area.getBottom(), false));
+        g.fillRoundedRectangle (area, 3.0f);
+        g.setColour (juce::Colours::white.withAlpha (selected ? 0.04f : 0.16f));
+        g.drawLine (area.getX() + 3.0f, area.getY() + 0.5f, area.getRight() - 3.0f, area.getY() + 0.5f, 1.0f);
+        if (selected)
+        {
+            g.setColour (colour.withAlpha (0.9f));
+            g.fillRect (area.getX() + 8.0f, area.getBottom() - 3.0f, area.getWidth() - 16.0f, 1.5f);
+        }
 
-        draw::led (g, { area.getX() + 14.0f, area.getCentreY() }, 3.0f, colour, stageOn);
-        g.setFont (juce::FontOptions (11.0f, juce::Font::bold).withKerningFactor (0.12f));
-        g.setColour (selected ? colour.brighter (0.4f) : (over ? colours::engrave : colours::engraveDim));
+        draw::led (g, { area.getX() + 14.0f, area.getCentreY() }, 2.8f, colour, stageOn);
+        g.setFont (juce::FontOptions (10.5f, juce::Font::bold).withKerningFactor (0.16f));
+        g.setColour (selected ? colour.brighter (0.5f) : (over ? colours::engrave : colours::engraveDim));
         g.drawText (getButtonText(), area.withTrimmedLeft (22.0f), juce::Justification::centred);
     }
 
@@ -255,10 +265,11 @@ protected:
     void layout() override
     {
         constexpr int top = 82, meterWidth = 190, mainHeight = 232, gap = 12, headerHeight = 36;
-        leftMeter->setBounds (20, top, meterWidth, mainHeight);
-        rightMeter->setBounds (getWidth() - 20 - meterWidth, top, meterWidth, mainHeight);
+        const auto area = plate().reduced (20, 0);
+        leftMeter->setBounds (area.getX(), top, meterWidth, mainHeight);
+        rightMeter->setBounds (area.getRight() - meterWidth, top, meterWidth, mainHeight);
 
-        auto centre = juce::Rectangle<int> (20 + meterWidth + 14, top, getWidth() - 2 * (20 + meterWidth + 14), mainHeight);
+        auto centre = juce::Rectangle<int> (area.getX() + meterWidth + 14, top, area.getWidth() - 2 * (meterWidth + 14), mainHeight);
         auto tabRow = centre.removeFromTop (28);
         centre.removeFromTop (6);
         const int tabWidth = (tabRow.getWidth() - (int) (numStages - 1) * 8) / (int) numStages;
@@ -286,8 +297,8 @@ protected:
         for (const auto& k : stageKnobs)
             total += cardWidth (k) + gap;
 
-        const int cardTop = top + mainHeight + 16;
-        const int cardHeight = getHeight() - cardTop - 32;
+        const int cardTop = top + mainHeight + 22;
+        const int cardHeight = getHeight() - cardTop - 30;
         int x = (getWidth() - total) / 2;
 
         const auto placeCard = [&] (const std::vector<Knob*>& cardKnobs, juce::Rectangle<int>& card, juce::Rectangle<int>& title) {
@@ -316,12 +327,9 @@ protected:
     void paintPanels (juce::Graphics& g) override
     {
         g.setFont (juce::FontOptions (12.0f, juce::Font::bold).withKerningFactor (0.14f));
-        const auto paintCard = [&g] (juce::Rectangle<int> card, juce::Rectangle<int> title, const juce::String& text, juce::Colour colour) {
-            draw::card (g, card.toFloat(), 14.0f);
-            g.setColour (colour);
-            g.drawText (text.toUpperCase(), title.toFloat(), juce::Justification::centredLeft);
-            g.setColour (colours::cardEdge);
-            g.fillRect ((float) card.getX() + 12.0f, (float) title.getBottom(), (float) card.getWidth() - 24.0f, 1.0f);
+        // Each stage is a silkscreened box with its name printed in the stage colour.
+        const auto paintCard = [&g] (juce::Rectangle<int> card, juce::Rectangle<int>, const juce::String& text, juce::Colour colour) {
+            draw::silkBox (g, card.toFloat().reduced (0.5f), text.toUpperCase(), colour);
         };
 
         for (size_t i = 0; i < numStages; ++i)
@@ -334,7 +342,7 @@ protected:
             chevron.startNewSubPath (right - 2.0f, mid - 4.0f);
             chevron.lineTo (right + 2.0f, mid);
             chevron.lineTo (right - 2.0f, mid + 4.0f);
-            g.setColour (colours::engraveDim.withAlpha (0.5f));
+            g.setColour (colours::engrave.withAlpha (0.55f));
             g.strokePath (chevron, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         paintCard (trimCard, trimTitle, "Trim", colours::engraveDim);
