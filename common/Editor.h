@@ -49,25 +49,26 @@ public:
         addAndMakeVisible (inSwitch);
         addAndMakeVisible (presetBar);
         addAndMakeVisible (updateBadge);
+        sizeSelect.onChange = [this] (int i) { setPanelSize (i); };
+        addAndMakeVisible (sizeSelect);
     }
 
     ~RackBase() override { setLookAndFeel (nullptr); }
 
     void paint (juce::Graphics& g) override { g.drawImageAt (background, 0, 0); }
 
-    // The panel is laid out at its base size and scaled as a whole: drag the corner to resize it.
+    // The panel is laid out at its base size and scaled as a whole to the size picked on SIZE.
     void resized() override
     {
         if (baseWidth == 0)
             return;
         scale = (float) getWidth() / (float) baseWidth;
-        if (scaleReady)
-            proc.apvts.state.setProperty ("uiScale", scale, nullptr);
 
         presetBar.setBounds (ear + 30, 112, 206, 66);
         updateBadge.setBounds (baseWidth - ear - 330, baseHeight - 20, 300, 14);
+        sizeSelect.setBounds (baseWidth / 2 - 20, baseHeight - 20, 92, 14);
         layout();
-        rackui::scaleChildren (*this, scale, resizableCorner.get());
+        rackui::scaleChildren (*this, scale);
 
         background = juce::Image (juce::Image::RGB, juce::jmax (1, getWidth()), juce::jmax (1, getHeight()), false);
         juce::Graphics g (background);
@@ -79,6 +80,8 @@ public:
                            proc.tagline().toUpperCase(), fehuMark(), rackui::colour::ink);
         rackui::print (g, "fenrikos", { (float) ear + 30.0f, (float) baseHeight - 20.0f, 200.0f, 14.0f }, rackui::Face::textMedium, 8.0f, 0.3f,
                        rackui::colour::inkFaint, juce::Justification::centredLeft);
+        rackui::print (g, "SIZE", { (float) sizeSelect.getX() - 40.0f, (float) sizeSelect.getY(), 34.0f, 14.0f }, rackui::Face::textMedium, 8.0f, 0.3f,
+                       rackui::colour::inkFaint, juce::Justification::centredRight);
         paintPanel (g);
     }
 
@@ -89,21 +92,25 @@ protected:
 
     void start (int plateWidth, int plateHeight)
     {
-        // Read the saved size first: setting the limits resizes the editor, which would overwrite it.
-        const auto saved = juce::jlimit (0.6f, 2.0f, (float) proc.apvts.state.getProperty ("uiScale", 1.0f));
         baseWidth = plateWidth + 2 * ear;
         baseHeight = plateHeight;
-        setResizable (true, true);
-        setResizeLimits (juce::roundToInt (baseWidth * 0.6), juce::roundToInt (baseHeight * 0.6), baseWidth * 2, baseHeight * 2);
-        getConstrainer()->setFixedAspectRatio ((double) baseWidth / (double) baseHeight);
-        scaleReady = true;
-        setSize (juce::roundToInt ((float) baseWidth * saved), juce::roundToInt ((float) baseHeight * saved));
+        setPanelSize ((int) proc.apvts.state.getProperty ("uiSize", 1));
         startTimerHz (60);
+    }
+
+    // S / M / L: the whole panel at 80, 100 or 125 %. Saved with the session.
+    void setPanelSize (int index)
+    {
+        index = juce::jlimit (0, 2, index);
+        sizeSelect.setSelected (index);
+        proc.apvts.state.setProperty ("uiSize", index, nullptr);
+        const auto s = rackui::sizeScale (index);
+        setSize (juce::roundToInt ((float) baseWidth * s), juce::roundToInt ((float) baseHeight * s));
     }
 
     int baseWidth = 0, baseHeight = 0;
     float scale = 1.0f;
-    bool scaleReady = false;   // only remember sizes the user (or host) chose
+    rackui::LedSelector sizeSelect { rackui::sizeNames(), juce::Colour (0xffffc928) };
 
     rackui::Knob& addKnob (const juce::String& id, bool big, std::vector<rackui::Mark> marks, const juce::String& unit,
                            juce::String name, juce::Colour accent, float bigSize = 76.0f, float smallSize = 52.0f)

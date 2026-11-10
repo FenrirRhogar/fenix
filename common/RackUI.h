@@ -841,6 +841,14 @@ inline void scaleChildren (juce::Component& parent, float scale, const juce::Com
             child->setTransform (transform);
 }
 
+// Panel sizes offered on every unit's SIZE selector.
+inline juce::StringArray sizeNames() { return { "S", "M", "L" }; }
+inline float sizeScale (int index)
+{
+    constexpr float scales[] { 0.8f, 1.0f, 1.25f };
+    return scales[juce::jlimit (0, 2, index)];
+}
+
 // A rune drawn as round-capped strokes in a 20x20 box: each stroke is { x1, y1, x2, y2 }.
 inline juce::Path rune (std::initializer_list<std::array<float, 4>> strokes, float thickness = 2.5f)
 {
