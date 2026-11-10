@@ -166,6 +166,29 @@ namespace draw
         g.strokePath (cross, juce::PathStrokeType (radius * 0.28f));
     }
 
+    // Rack ears either side of `bounds`, each folded back from the plate with two slotted screws.
+    inline void rackEars (juce::Graphics& g, juce::Rectangle<float> bounds, float ear)
+    {
+        for (const bool left : { true, false })
+        {
+            const auto earArea = left ? bounds.withWidth (ear) : bounds.withLeft (bounds.getRight() - ear);
+            g.setColour (juce::Colours::black.withAlpha (0.18f));
+            g.fillRect (earArea);
+            const auto foldX = left ? earArea.getRight() : earArea.getX();
+            g.setColour (juce::Colours::black.withAlpha (0.6f));
+            g.fillRect (foldX - (left ? 1.0f : 0.0f), bounds.getY(), 1.0f, bounds.getHeight());
+            g.setColour (juce::Colours::white.withAlpha (0.08f));
+            g.fillRect (foldX + (left ? 0.0f : -1.0f), bounds.getY(), 1.0f, bounds.getHeight());
+
+            for (auto y : { bounds.getY() + 46.0f, bounds.getBottom() - 46.0f })
+            {
+                const auto slot = juce::Rectangle<float> (13.0f, 24.0f).withCentre ({ earArea.getCentreX(), y });
+                recess (g, slot, 6.5f, juce::Colour (0xff050506));
+                screw (g, { slot.getCentreX(), slot.getCentreY() + 3.0f }, 6.0f, y < bounds.getCentreY() ? 0.4f : 1.1f);
+            }
+        }
+    }
+
     // Machined seam across the plate: a dark groove with a lit lower lip.
     inline void seam (juce::Graphics& g, float x1, float x2, float y)
     {

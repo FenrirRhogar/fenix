@@ -190,7 +190,7 @@ public:
 
         // Body from the cache, then the parts that turn: the skirt's printed line and the cap's painted pointer.
         const float scale = g.getInternalContext().getPhysicalPixelScaleFactor();
-        if (body.isNull() || bodyRadius != r || bodyScale != scale)
+        if (body.isNull() || ! juce::exactlyEqual (bodyRadius, r) || ! juce::exactlyEqual (bodyScale, scale))
         {
             bodyRadius = r;
             bodyScale = scale;
@@ -331,7 +331,7 @@ public:
         // Everything but the needle and peak lamp is static: bezel, face and printed scale go in one
         // image, the glass and the pivot cover that sit over the needle in another.
         const float scale = g.getInternalContext().getPhysicalPixelScaleFactor();
-        if (under.isNull() || scale != cacheScale)
+        if (under.isNull() || ! juce::exactlyEqual (scale, cacheScale))
         {
             cacheScale = scale;
             const auto make = [&] (auto&& draw) {
@@ -463,9 +463,9 @@ private:
         g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.45f), 0.0f, face.getY(),
                                                  juce::Colours::black.withAlpha (0.0f), 0.0f, face.getY() + 14.0f, false));
         g.fillRect (face.withHeight (14.0f));
-        for (auto side : { face.withWidth (8.0f), face.withLeft (face.getRight() - 8.0f) })
+        for (const bool left : { true, false })
         {
-            const bool left = side.getX() == face.getX();
+            const auto side = left ? face.withWidth (8.0f) : face.withLeft (face.getRight() - 8.0f);
             g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.25f), left ? face.getX() : face.getRight(), 0.0f,
                                                      juce::Colours::black.withAlpha (0.0f), left ? face.getX() + 8.0f : face.getRight() - 8.0f, 0.0f, false));
             g.fillRect (side);
@@ -531,7 +531,7 @@ public:
         // of the cost of a frame, so they are rendered once per size and display scale, as is
         // the reflection that sits over the trace.
         const float scale = g.getInternalContext().getPhysicalPixelScaleFactor();
-        if (background.isNull() || scale != backgroundScale)
+        if (background.isNull() || ! juce::exactlyEqual (scale, backgroundScale))
         {
             backgroundScale = scale;
             const auto w = juce::jmax (1, juce::roundToInt ((float) getWidth() * scale));

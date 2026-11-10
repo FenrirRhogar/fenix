@@ -55,12 +55,12 @@ private:
             g.setColour (accent.withAlpha (over ? 0.08f : 0.04f));
             g.fillRoundedRectangle (area, 3.0f);
 
-            const auto text = area.withTrimmedLeft (12.0f).withTrimmedRight (28.0f);
+            const auto textArea = area.withTrimmedLeft (12.0f).withTrimmedRight (28.0f);
             g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::bold));
             g.setColour (accent.withAlpha (0.25f));
-            g.drawText (getButtonText().toUpperCase(), text.translated (0.0f, 0.5f).expanded (0.5f), juce::Justification::centredLeft, true);
+            g.drawText (getButtonText().toUpperCase(), textArea.translated (0.0f, 0.5f).expanded (0.5f), juce::Justification::centredLeft, true);
             g.setColour (accent.brighter (0.4f));
-            g.drawText (getButtonText().toUpperCase(), text, juce::Justification::centredLeft, true);
+            g.drawText (getButtonText().toUpperCase(), textArea, juce::Justification::centredLeft, true);
 
             juce::Path caret;
             const auto cx = area.getRight() - 15.0f, cy = area.getCentreY();

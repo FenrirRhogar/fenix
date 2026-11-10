@@ -94,25 +94,7 @@ private:
 
         draw::brushedMetal (g, bounds, colours::plateTop, colours::plateBottom);
 
-        // Rack ears: a fold in the metal either side, each with two slotted mounting screws.
-        for (auto earArea : { bounds.withWidth ((float) ear), bounds.withLeft (bounds.getRight() - (float) ear) })
-        {
-            g.setColour (juce::Colours::black.withAlpha (0.18f));
-            g.fillRect (earArea);
-            const bool left = earArea.getX() == 0.0f;
-            const auto foldX = left ? earArea.getRight() : earArea.getX();
-            g.setColour (juce::Colours::black.withAlpha (0.6f));
-            g.fillRect (foldX - (left ? 1.0f : 0.0f), 0.0f, 1.0f, bounds.getHeight());
-            g.setColour (juce::Colours::white.withAlpha (0.08f));
-            g.fillRect (foldX + (left ? 0.0f : -1.0f), 0.0f, 1.0f, bounds.getHeight());
-
-            for (auto y : { 46.0f, bounds.getHeight() - 46.0f })
-            {
-                const auto slot = juce::Rectangle<float> (13.0f, 24.0f).withCentre ({ earArea.getCentreX(), y });
-                draw::recess (g, slot, 6.5f, juce::Colour (0xff050506));
-                draw::screw (g, { slot.getCentreX(), slot.getCentreY() + 3.0f }, 6.0f, y < 100.0f ? 0.4f : 1.1f);
-            }
-        }
+        draw::rackEars (g, bounds, (float) ear);
 
         // Top and bottom edges of the plate catch the light.
         g.setColour (juce::Colours::white.withAlpha (0.12f));
