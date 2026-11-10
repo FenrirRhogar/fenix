@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" alt="Fenix" width="120"/></p>
+
 # Fenix
 
 A suite of mix-bus colour processors by **fenrikos**, built with JUCE 8 for Windows, macOS and Linux
@@ -13,7 +15,7 @@ All five stages in series: Drive → Shelf EQ → HF Comp → Width → Iron, th
 
 - Each stage has its own **IN** switch. Switching a stage in or out crossfades against a latency-matched
   dry path, so it never clicks or shifts timing.
-- The tabs above the display pick which stage's view is shown (clicking a card's title does the same).
+- The stage buttons above the screen pick which stage's view is shown; their LEDs show which stages are in.
 - Combined presets such as *Warm Master*, *Drum Bus Glue*, *Vocal Sheen* or *Lo-Fi Crush* set every stage at once.
 - Every stage runs the same code as its standalone plugin, so settings sound identical in both.
 
@@ -23,24 +25,28 @@ All five stages in series: Drive → Shelf EQ → HF Comp → Width → Iron, th
 |---|---|---|
 | **Fenix Drive** | Level-dependent harmonic saturation. A variable-knee sigmoid with DC bias for even harmonics, level-compensated, 4x oversampled. | Live transfer curve, with dots tracking the input peak |
 | **Fenix Shelf EQ** | Two broad shelves with stepped frequencies for tonal tilts. Low-Q shelves, 2x oversampled so the top shelf holds its shape up to 20 kHz. | EQ response over a real-time spectrum |
-| **Fenix HF Comp** | Compresses only the band above the crossover. LR4 split, stereo-linked peak detector, 4:1 soft knee, fast attack. | Spectrum with the compressed band lit, scrolling gain-reduction history, GR needle meter |
+| **Fenix HF Comp** | Compresses only the band above the crossover. LR4 split, stereo-linked peak detector, 4:1 soft knee, fast attack. | Ten-LED meter showing gain reduction, input or output (in Bus: spectrum with the compressed band lit and GR history) |
 | **Fenix Width** | Mid/side width, plus "Space": a low-frequency side lift (shuffler-style) for depth without a phasey top end. | Goniometer with phosphor persistence, correlation bar |
 | **Fenix Iron** | Output transformer colour. Only the low band saturates (flux-dependent), with a small LF resonance and gentle HF softening. | Output scope and the core's magnetisation curve |
 
 <p>
-  <img src="docs/drive.png" width="49%" alt="Fenix Drive">
-  <img src="docs/shelf.png" width="49%" alt="Fenix Shelf EQ">
-  <img src="docs/hfcomp.png" width="49%" alt="Fenix HF Comp">
-  <img src="docs/width.png" width="49%" alt="Fenix Width">
-  <img src="docs/iron.png" width="49%" alt="Fenix Iron">
+  <img src="docs/drive.png" width="100%" alt="Fenix Drive">
+  <img src="docs/shelf.png" width="100%" alt="Fenix Shelf EQ">
+  <img src="docs/hfcomp.png" width="100%" alt="Fenix HF Comp">
+  <img src="docs/width.png" width="100%" alt="Fenix Width">
+  <img src="docs/iron.png" width="100%" alt="Fenix Iron">
 </p>
 
 ## Features
 
-- **Presets.** Every plugin ships factory presets, which hosts also see as programs. Click the preset name for the
-  full list, use the arrows to step through it, or **SAVE** your own. User presets go to
+- **Presets.** Every plugin ships factory presets, which hosts also see as programs. Click the preset window for the
+  full list, use the arrows to step through it, or **STORE** your own. User presets go to
   `~/.config/fenrikos/Fenix/<plugin>/`; the menu can also delete them or open that folder.
-- **Bypass.** The power switch crossfades to a latency-compensated dry path and is exposed as the host's bypass parameter.
+- **Bypass.** The **IN** switch crossfades to a latency-compensated dry path and is exposed as the host's bypass parameter.
+- **Calibrated VU meters.** Click **CAL** under a meter to set the level that reads 0 VU: -18, -14, -10 (default) or
+  -6 dBFS RMS, so the needle sits around 0 on your material instead of pinning. The peak lamp lights on real overs
+  (-1 dBFS and above). The setting is saved with the session.
+- **SIZE.** The S / M / L switch at the bottom scales the whole panel to 80, 100 or 125 %; all units share one width.
 - **Light on the UI thread.** Static artwork is cached and meters only repaint when their needles move, so the
   editor stays responsive alongside the 60 fps displays.
 - Double-click any knob to reset it.
