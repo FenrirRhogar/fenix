@@ -19,6 +19,13 @@ else()
     set(FENIX_FORMATS VST3 LV2)
 endif()
 
+# Panel fonts, compiled into every plugin so legends look the same on every platform.
+juce_add_binary_data(FenixFonts
+    HEADER_NAME "FenixFonts.h"
+    NAMESPACE FenixFonts
+    SOURCES common/fonts/NotoSans-Bold.ttf common/fonts/NotoSans-Medium.ttf)
+set_target_properties(FenixFonts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 function(fenix_plugin target name code)
     juce_add_plugin(${target}
         COMPANY_NAME fenrikos
@@ -47,7 +54,8 @@ function(fenix_plugin target name code)
         JUCE_VST3_CAN_REPLACE_VST2=0)
     target_link_libraries(${target}
         PRIVATE juce::juce_audio_utils juce::juce_dsp
-        PUBLIC juce::juce_recommended_config_flags
+        PUBLIC FenixFonts
+               juce::juce_recommended_config_flags
                juce::juce_recommended_warning_flags)
     if(FENIX_LTO)
         target_link_libraries(${target} PUBLIC juce::juce_recommended_lto_flags)
