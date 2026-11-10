@@ -40,6 +40,8 @@ class RackBase : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     static constexpr int ear = rackui::earWidth;
+    // Every Fenix unit has the same width, like rack gear; single units are 250 tall, Bus 570.
+    static constexpr int standardPlateWidth = 1350;
 
     explicit RackBase (Processor& p) : AudioProcessorEditor (p), proc (p), presetBar (p)
     {
@@ -245,12 +247,14 @@ public:
             ladderMeter = std::make_unique<LadderMeter> (p);
         addAndMakeVisible (centre());
 
-        // Plate width follows the contents.
-        int width = 30 + 206 + gap + 2 + gap + gap + 2 + gap + 50 + 30;
+        // Every unit is the standard width; whatever the controls do not need is shared out
+        // as space around the centre piece.
+        int natural = 30 + 206 + gap + 2 + gap + gap + 2 + gap + 50 + 30;
         for (const auto& k : knobs)
-            width += k->preferredSize().x;
-        width += spec.centreWidth + 2 * gap;
-        start (width, plateHeight);
+            natural += k->preferredSize().x;
+        natural += spec.centreWidth + 2 * gap;
+        spare = juce::jmax (0, standardPlateWidth - natural) / 4;
+        start (juce::jmax (standardPlateWidth, natural), plateHeight);
     }
 
 protected:
@@ -270,7 +274,7 @@ protected:
         int x = ear + 30 + 206 + gap;
         dividers.clear();
         dividers.push_back (x);
-        x += 2 + gap;
+        x += 2 + gap + spare;
         const auto placeKnob = [&] (rackui::Knob* k) {
             const auto s = k->preferredSize();
             k->setBounds (x, (plateHeight - s.y) / 2 - 2, s.x, s.y);
@@ -278,13 +282,13 @@ protected:
         };
         for (auto* k : leftKnobs)
             placeKnob (k);
-        x += gap;
+        x += gap + spare;
         const int centreHeight = spec.centre == Centre::vu ? 172 : spec.centre == Centre::display ? 176 : 190;
         centre().setBounds (x, (plateHeight - centreHeight) / 2 - 4, spec.centreWidth, centreHeight);
-        x += spec.centreWidth + gap;
+        x += spec.centreWidth + gap + spare;
         for (auto* k : rightKnobs)
             placeKnob (k);
-        x += gap;
+        x += gap + spare;
         dividers.push_back (x);
         x += 2 + gap;
         inSwitch.setBounds (x, (plateHeight - 64) / 2 - 6, 50, 64);
@@ -316,6 +320,7 @@ protected:
     std::unique_ptr<Display> display;
     std::unique_ptr<LadderMeter> ladderMeter;
     std::vector<int> dividers;
+    int spare = 0;
 };
 
 // Fallback for a plugin that does not describe its panel: every parameter as a small knob around a scope.

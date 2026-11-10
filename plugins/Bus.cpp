@@ -201,7 +201,7 @@ public:
 class BusEditor final : public RackBase
 {
 public:
-    static constexpr int plateWidth = 1290, plateHeight = 570, knobSize = 44, columnPitch = 104, moduleGap = 14;
+    static constexpr int plateWidth = standardPlateWidth, plateHeight = 570, knobSize = 44, columnPitch = 104, moduleGap = 14;
 
     explicit BusEditor (BusProcessor& p) : RackBase (p), bus (p)
     {

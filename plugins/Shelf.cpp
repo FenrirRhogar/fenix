@@ -45,7 +45,7 @@ public:
                        { "highFreq", false, marks ({ { 0, "6" }, { 1, "8" }, { 2, "12" }, { 3, "16" }, { 4, "20" } }), "kHz" },
                        { "output", false, dbMarks(), "dB" } };
         spec.centre = Centre::display;
-        spec.centreWidth = 300;
+        spec.centreWidth = 260;
         return new RackEditor (*this, std::move (spec));
     }
 
