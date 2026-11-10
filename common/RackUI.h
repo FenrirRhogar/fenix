@@ -307,6 +307,31 @@ public:
         setPopupMenuEnabled (false);
     }
 
+    Knob() : Knob (46.0f, Variant::black, colour::ink, {}, {}, {}) {}
+
+    void configure (float bodySize, Variant v, juce::Colour accentColour, juce::String nameText, juce::String unitText, std::vector<Mark> scaleMarks)
+    {
+        size = bodySize;
+        variant = v;
+        accent = accentColour;
+        name = std::move (nameText);
+        unit = std::move (unitText);
+        marks = std::move (scaleMarks);
+        body = {};
+        repaint();
+    }
+
+    // The printed name, and its colour (e.g. to show a MIDI mapping).
+    void setLegend (const juce::String& text, juce::Colour c = colour::ink)
+    {
+        if (text != name || c != legendColour)
+        {
+            name = text;
+            legendColour = c;
+            repaint();
+        }
+    }
+
     // Component size this knob wants (scale labels need room around the body).
     juce::Point<int> preferredSize() const { return { juce::roundToInt (size + 70.0f), juce::roundToInt (size + (name.isEmpty() ? 52.0f : 74.0f)) }; }
 
@@ -365,7 +390,7 @@ public:
         if (name.isNotEmpty())
         {
             const float y = c.y + r + 18.0f;
-            print (g, name, { 0.0f, y, (float) getWidth(), 14.0f }, Face::legend, 12.5f, 0.18f);
+            print (g, name, { 0.0f, y, (float) getWidth(), 14.0f }, Face::legend, 12.5f, 0.18f, legendColour);
             if (live)
                 print (g, getTextFromValue (getValue()), { 0.0f, y + 15.0f, (float) getWidth(), 12.0f }, Face::mono, 9.5f, 0.0f,
                        accent.interpolatedWith (juce::Colours::white, 0.5f));
@@ -457,6 +482,7 @@ private:
     juce::Colour accent;
     juce::String name, unit;
     std::vector<Mark> marks;
+    juce::Colour legendColour = colour::ink;
     juce::Image body;
     float bodyScale = 0.0f;
 };
