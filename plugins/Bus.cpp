@@ -173,35 +173,22 @@ private:
 };
 
 //==============================================================================
-// Pill tab for choosing which stage's display is shown, with a dot that lights while the stage is in.
+// Stage selector cap: an LED in the stage colour (lit while the stage is in), latched down when
+// its stage's view is on the screen.
 class StageTab : public juce::Button
 {
 public:
     StageTab() : Button ({}) {}
 
-    // Hardware selector button with an LED for the stage's IN state; the selected one stays latched down.
     void paintButton (juce::Graphics& g, bool over, bool down) override
     {
-        auto area = getLocalBounds().toFloat().reduced (1.0f, 1.5f);
-        g.setColour (juce::Colours::black.withAlpha (0.75f));
-        g.fillRoundedRectangle (area.translated (0.0f, 1.5f), 3.5f);
+        auto r = getLocalBounds().toFloat().reduced (0.5f, 1.0f).withTrimmedBottom (1.5f);
+        rackui::cap (g, r, over, down, selected);
         if (selected || down)
-            area.translate (0.0f, 1.0f);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (selected ? 0xff2a2c30 : (over ? 0xff4a4d53 : 0xff404349)), 0.0f, area.getY(),
-                                                 juce::Colour (selected ? 0xff1b1c1f : 0xff222428), 0.0f, area.getBottom(), false));
-        g.fillRoundedRectangle (area, 3.0f);
-        g.setColour (juce::Colours::white.withAlpha (selected ? 0.04f : 0.16f));
-        g.drawLine (area.getX() + 3.0f, area.getY() + 0.5f, area.getRight() - 3.0f, area.getY() + 0.5f, 1.0f);
-        if (selected)
-        {
-            g.setColour (colour.withAlpha (0.9f));
-            g.fillRect (area.getX() + 8.0f, area.getBottom() - 3.0f, area.getWidth() - 16.0f, 1.5f);
-        }
-
-        draw::led (g, { area.getX() + 14.0f, area.getCentreY() }, 2.8f, colour, stageOn);
-        g.setFont (juce::FontOptions (10.5f, juce::Font::bold).withKerningFactor (0.16f));
-        g.setColour (selected ? colour.brighter (0.5f) : (over ? colours::engrave : colours::engraveDim));
-        g.drawText (getButtonText(), area.withTrimmedLeft (22.0f), juce::Justification::centred);
+            r.translate (0.0f, 0.5f);
+        rackui::led (g, { r.getX() + 13.0f, r.getCentreY() }, 3.0f, colour, stageOn);
+        rackui::print (g, getButtonText(), r.withTrimmedLeft (22.0f), rackui::Face::legend, 11.0f, 0.16f,
+                       selected ? juce::Colours::white : rackui::colour::inkSoft, juce::Justification::centred);
     }
 
     juce::Colour colour;
@@ -209,12 +196,14 @@ public:
 };
 
 //==============================================================================
-// Bus faceplate: tabs choose the stage shown on the display; below, one card per stage with its
-// IN switch and knobs in signal order, then a trim card. Clicking a card's title selects its display.
-class BusEditor final : public EditorBase
+// Fenix Bus as one rack unit. Top: nameplate, input VU, stage tabs over the screen, output VU, IN.
+// Below: one module per stage (its LED switch carries the name), knobs in columns of two, then trims.
+class BusEditor final : public RackBase
 {
 public:
-    explicit BusEditor (BusProcessor& p) : EditorBase (p), bus (p)
+    static constexpr int plateWidth = 1290, plateHeight = 570, knobSize = 44, columnPitch = 104, moduleGap = 14;
+
+    explicit BusEditor (BusProcessor& p) : RackBase (p), bus (p)
     {
         views[0] = std::make_unique<drive::View> (p, p.driveModule, stages[0].prefix);
         views[1] = std::make_unique<shelf::View> (p, p.shelfModule, stages[1].prefix);
@@ -222,138 +211,118 @@ public:
         views[3] = std::make_unique<width::View> (p, p.widthModule, stages[3].prefix);
         views[4] = std::make_unique<iron::View> (p, p.ironModule, stages[4].prefix);
 
+        using M = std::vector<rackui::Mark>;
+        const M pct = marks ({ { 0, "0" }, { 50, "50" }, { 100, "100" } });
+        const M db = marks ({ { -12, "-12" }, { 0, "0" }, { 12, "+12" } });
+        struct K { const char* id; const char* name; const char* unit; M m; bool metal; };
+        const std::vector<std::vector<K>> layouts {
+            { { "drive", "DRIVE", "dB", marks ({ { 0, "0" }, { 12, "12" }, { 24, "24" } }), true }, { "density", "DENSITY", "%", pct, false },
+              { "mix", "MIX", "%", pct, false }, { "output", "OUTPUT", "dB", db, false } },
+            { { "lowFreq", "LOW FREQ", "Hz", marks ({ { 0, "30" }, { 1, "60" }, { 2, "90" }, { 3, "120" }, { 4, "200" } }), true },
+              { "lowGain", "LOW", "dB", db, false },
+              { "highFreq", "HIGH FREQ", "kHz", marks ({ { 0, "6" }, { 1, "8" }, { 2, "12" }, { 3, "16" }, { 4, "20" } }), true },
+              { "highGain", "HIGH", "dB", db, false }, { "output", "OUTPUT", "dB", db, false } },
+            { { "threshold", "THRESHOLD", "dB", marks ({ { -40, "-40" }, { -20, "-20" }, { 0, "0" } }), true },
+              { "crossover", "CROSSOVER", "kHz", marks ({ { 2000, "2" }, { 6000, "6" }, { 16000, "16" } }), false },
+              { "mix", "MIX", "%", pct, false }, { "output", "OUTPUT", "dB", db, false } },
+            { { "width", "WIDTH", "%", marks ({ { 0, "0" }, { 100, "100" }, { 200, "200" } }), true }, { "space", "SPACE", "%", pct, false },
+              { "output", "OUTPUT", "dB", db, false } },
+            { { "amount", "AMOUNT", "%", pct, true }, { "output", "OUTPUT", "dB", db, false } },
+        };
+
         for (size_t i = 0; i < numStages; ++i)
         {
             addChildComponent (*views[i]);
-
             tabs[i].setButtonText (stages[i].name.toUpperCase());
             tabs[i].colour = stages[i].colour;
             tabs[i].onClick = [this, i] { select (i); };
             addAndMakeVisible (tabs[i]);
 
-            switches[i] = std::make_unique<PowerButton> (stages[i].colour, true);
+            switches[i] = std::make_unique<rackui::LedToggle> (stages[i].name.toUpperCase(), stages[i].colour);
             switchAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (p.apvts, stages[i].prefix + "on", *switches[i]);
             addAndMakeVisible (*switches[i]);
 
-            for (auto* raw : p.getParameters())
-            {
-                auto* param = dynamic_cast<juce::RangedAudioParameter*> (raw);
-                if (param == nullptr)
-                    continue;
-                const auto id = param->getParameterID();
-                if (id.startsWith (stages[i].prefix) && id != stages[i].prefix + "on")
-                    stageKnobs[i].push_back (&addKnob (*param, stages[i].colour,
-                                                       param->getName (64).fromFirstOccurrenceOf (stages[i].name + " ", false, false)));
-            }
+            for (const auto& k : layouts[i])
+                stageKnobs[i].push_back (&addKnob (stages[i].prefix + k.id, k.metal, k.m, k.unit, k.name, stages[i].colour, (float) knobSize, (float) knobSize));
         }
-
         for (auto* id : { "input", "output" })
-            trimKnobs.push_back (&addKnob (*p.apvts.getParameter (id), p.accent()));
+            trimKnobs.push_back (&addKnob (id, false, db, "dB", juce::String (id).toUpperCase(), rackui::colour::inkDim, (float) knobSize, (float) knobSize));
+
+        inputVu = makeVu ("INPUT", p.inputRms, p.inputPeak);
+        outputVu = makeVu ("OUTPUT", p.outputRms, p.outputPeak);
+        addAndMakeVisible (*inputVu);
+        addAndMakeVisible (*outputVu);
 
         select ((size_t) juce::jlimit (0, (int) numStages - 1, (int) p.apvts.state.getProperty ("view", 0)));
-        start (1280, 660);
-    }
-
-    void mouseUp (const juce::MouseEvent& e) override
-    {
-        for (size_t i = 0; i < numStages; ++i)
-            if (titles[i].contains (e.getPosition()))
-                select (i);
+        start (plateWidth, plateHeight);
     }
 
 protected:
     void layout() override
     {
-        constexpr int top = 82, meterWidth = 190, mainHeight = 232, gap = 12, headerHeight = 36;
-        const auto area = plate().reduced (20, 0);
-        leftMeter->setBounds (area.getX(), top, meterWidth, mainHeight);
-        rightMeter->setBounds (area.getRight() - meterWidth, top, meterWidth, mainHeight);
-
-        auto centre = juce::Rectangle<int> (area.getX() + meterWidth + 14, top, area.getWidth() - 2 * (meterWidth + 14), mainHeight);
-        auto tabRow = centre.removeFromTop (28);
-        centre.removeFromTop (6);
-        const int tabWidth = (tabRow.getWidth() - (int) (numStages - 1) * 8) / (int) numStages;
+        const int left = ear + 30, right = ear + plateWidth - 30;
+        // Top row.
+        inputVu->setBounds (left + 206 + 30, 30, 172, 172);
+        outputVu->setBounds (right - 60 - 30 - 172, 30, 172, 172);
+        const int screenX = inputVu->getRight() + 26, screenW = outputVu->getX() - 26 - screenX;
+        const int tabW = (screenW - (int) (numStages - 1) * 6) / (int) numStages;
         for (size_t i = 0; i < numStages; ++i)
         {
-            tabs[i].setBounds (tabRow.removeFromLeft (tabWidth));
-            tabRow.removeFromLeft (8);
-            views[i]->setBounds (centre);
+            tabs[i].setBounds (screenX + (int) i * (tabW + 6), 28, tabW, 26);
+            views[i]->setBounds (screenX - 2, 60, screenW + 4, 150);
         }
+        inSwitch.setBounds (right - 50, 72, 50, 64);
+        ruleY = 236;
 
-        // Cards: knobs fill two rows, column by column; the whole row of cards is centred.
-        // Columns holding a stepped switch are wider to fit its position labels.
-        const auto columnWidths = [] (const std::vector<Knob*>& cardKnobs) {
-            std::vector<int> widths ((cardKnobs.size() + 1) / 2, 90);
-            for (size_t k = 0; k < cardKnobs.size(); ++k)
-                if (cardKnobs[k]->isStepped())
-                    widths[k / 2] = 112;
-            return widths;
-        };
-        const auto cardWidth = [&] (const std::vector<Knob*>& cardKnobs) {
-            const auto widths = columnWidths (cardKnobs);
-            return std::accumulate (widths.begin(), widths.end(), 24);
-        };
-        int total = cardWidth (trimKnobs);
-        for (const auto& k : stageKnobs)
-            total += cardWidth (k) + gap;
-
-        const int cardTop = top + mainHeight + 22;
-        const int cardHeight = getHeight() - cardTop - 30;
-        int x = (getWidth() - total) / 2;
-
-        const auto placeCard = [&] (const std::vector<Knob*>& cardKnobs, juce::Rectangle<int>& card, juce::Rectangle<int>& title) {
-            card = { x, cardTop, cardWidth (cardKnobs), cardHeight };
-            x += card.getWidth() + gap;
-            auto inner = card.reduced (12, 0);
-            title = inner.removeFromTop (headerHeight);
-            inner.removeFromTop (4);
-            const int rowHeight = (inner.getHeight() - 8) / 2;
-            const auto widths = columnWidths (cardKnobs);
-            for (size_t k = 0; k < cardKnobs.size(); ++k)
+        // Modules: columns of two knobs; the whole row is centred.
+        std::vector<int> columns;
+        for (size_t i = 0; i < numStages; ++i)
+            columns.push_back ((int) (stageKnobs[i].size() + 1) / 2);
+        columns.push_back (1);
+        int total = -moduleGap;
+        for (auto c : columns)
+            total += c * columnPitch + moduleGap;
+        int x = ear + (plateWidth - total) / 2;
+        const int headerY = ruleY + 18, knobY = headerY + 26;
+        const auto place = [&] (const std::vector<rackui::Knob*>& ks, int columnCount) {
+            for (size_t k = 0; k < ks.size(); ++k)
             {
-                const int columnX = std::accumulate (widths.begin(), widths.begin() + (long) (k / 2), inner.getX());
-                cardKnobs[k]->setBounds (columnX, inner.getY() + (int) (k % 2) * rowHeight, widths[k / 2], rowHeight);
+                const auto s = ks[k]->preferredSize();
+                const int cx = x + (int) (k / 2) * columnPitch + columnPitch / 2;
+                ks[k]->setBounds (cx - s.x / 2, knobY + (int) (k % 2) * (s.y + 6), s.x, s.y);
             }
+            const int start = x;
+            x += columnCount * columnPitch + moduleGap;
+            return start;
         };
-
+        moduleX.clear();
         for (size_t i = 0; i < numStages; ++i)
         {
-            placeCard (stageKnobs[i], cards[i], titles[i]);
-            switches[i]->setBounds (titles[i].removeFromRight (44).withSizeKeepingCentre (44, 22));
+            const int mx = place (stageKnobs[i], columns[i]);
+            moduleX.push_back (mx);
+            switches[i]->setBounds (mx + 14, headerY, columns[i] * columnPitch - 20, 20);
         }
-        placeCard (trimKnobs, trimCard, trimTitle);
+        moduleX.push_back (place (trimKnobs, 1));
     }
 
-    void paintPanels (juce::Graphics& g) override
+    void paintPanel (juce::Graphics& g) override
     {
-        g.setFont (juce::FontOptions (12.0f, juce::Font::bold).withKerningFactor (0.14f));
-        // Each stage is a silkscreened box with its name printed in the stage colour.
-        const auto paintCard = [&g] (juce::Rectangle<int> card, juce::Rectangle<int>, const juce::String& text, juce::Colour colour) {
-            draw::silkBox (g, card.toFloat().reduced (0.5f), text.toUpperCase(), colour);
-        };
-
-        for (size_t i = 0; i < numStages; ++i)
-        {
-            paintCard (cards[i], titles[i], stages[i].name, stages[i].colour);
-
-            // Chevron between cards: the signal flows left to right.
-            const auto right = (float) cards[i].getRight() + 6.0f, mid = (float) cards[i].getCentreY();
-            juce::Path chevron;
-            chevron.startNewSubPath (right - 2.0f, mid - 4.0f);
-            chevron.lineTo (right + 2.0f, mid);
-            chevron.lineTo (right - 2.0f, mid + 4.0f);
-            g.setColour (colours::engrave.withAlpha (0.55f));
-            g.strokePath (chevron, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        }
-        paintCard (trimCard, trimTitle, "Trim", colours::engraveDim);
+        rackui::rule (g, (float) ear + 30.0f, (float) (ear + plateWidth - 30), (float) ruleY);
+        rackui::print (g, "TRIM", { (float) moduleX.back() + 14.0f, (float) ruleY + 18.0f, 100.0f, 20.0f }, rackui::Face::legendBold, 13.0f, 0.2f,
+                       rackui::colour::ink, juce::Justification::centredLeft);
+        for (size_t i = 1; i < moduleX.size(); ++i)
+            rackui::divider (g, (float) moduleX[i] - (float) moduleGap * 0.5f - 1.0f, (float) ruleY + 22.0f, 260.0f);
     }
 
     void tick() override
     {
+        constexpr float dt = 1.0f / 60.0f;
+        for (auto* vu : { inputVu.get(), outputVu.get() })
+            if (vu->tick (dt))
+                vu->repaint();
         views[selected]->tick();
         views[selected]->repaint();
 
-        // Dim a stage's knobs while it is switched out.
         for (size_t i = 0; i < numStages; ++i)
         {
             const bool on = bus.isStageOn (i);
@@ -361,7 +330,7 @@ protected:
                 continue;
             lastOn[i] = on ? 1 : 0;
             for (auto* knob : stageKnobs[i])
-                knob->setAlpha (on ? 1.0f : 0.4f);
+                knob->setAlpha (on ? 1.0f : 0.45f);
             tabs[i].stageOn = on;
             tabs[i].repaint();
         }
@@ -383,13 +352,14 @@ private:
     BusProcessor& bus;
     std::array<std::unique_ptr<Display>, numStages> views;
     std::array<StageTab, numStages> tabs;
-    std::array<std::unique_ptr<PowerButton>, numStages> switches;
+    std::array<std::unique_ptr<rackui::LedToggle>, numStages> switches;
     std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>, numStages> switchAttachments;
-    std::array<std::vector<Knob*>, numStages> stageKnobs;
-    std::vector<Knob*> trimKnobs;
-    std::array<juce::Rectangle<int>, numStages> cards, titles;
-    juce::Rectangle<int> trimCard, trimTitle;
+    std::array<std::vector<rackui::Knob*>, numStages> stageKnobs;
+    std::vector<rackui::Knob*> trimKnobs;
+    std::unique_ptr<rackui::VuMeter> inputVu, outputVu;
     std::array<int, numStages> lastOn { -1, -1, -1, -1, -1 };
+    std::vector<int> moduleX;
+    int ruleY = 236;
     size_t selected = 0;
 };
 

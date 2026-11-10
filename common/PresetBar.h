@@ -2,11 +2,13 @@
 
 #include "Look.h"
 #include "Processor.h"
+#include "RackUI.h"
 
 namespace fenix
 {
 
-// Preset selector: previous / name / next, plus save. The menu is built from scratch each
+// Preset panel: the name in a recessed OLED window (click it for the menu), with previous / next /
+// store caps underneath. The menu is built from scratch each
 // time it opens, so it is always current and nothing rebuilds it while it is on screen.
 class PresetBar : public juce::Component
 {
@@ -33,41 +35,34 @@ public:
     void resized() override
     {
         auto b = getLocalBounds();
-        save.setBounds (b.removeFromRight (58));
-        b.removeFromRight (8);
-        previous.setBounds (b.removeFromLeft (28));
-        next.setBounds (b.removeFromRight (28));
-        nameButton.setBounds (b.reduced (4, 0));
+        nameButton.setBounds (b.removeFromTop (34));
+        b.removeFromTop (10);
+        auto row = b.removeFromTop (22);
+        previous.setBounds (row.removeFromLeft (30));
+        row.removeFromLeft (6);
+        next.setBounds (row.removeFromLeft (30));
+        row.removeFromLeft (6);
+        save.setBounds (row.removeFromLeft (58));
     }
 
 private:
-    // Pill showing the current preset name with a drop-down caret.
     class NameButton : public juce::Button
     {
     public:
         explicit NameButton (juce::Colour a) : Button ({}), accent (a) {}
 
-        // Recessed display window with the preset name lit in the plugin's colour.
         void paintButton (juce::Graphics& g, bool over, bool) override
         {
-            const auto area = getLocalBounds().toFloat().reduced (1.5f);
-            draw::recess (g, area, 3.0f, colours::lcd);
-            g.setColour (accent.withAlpha (over ? 0.08f : 0.04f));
-            g.fillRoundedRectangle (area, 3.0f);
-
-            const auto textArea = area.withTrimmedLeft (12.0f).withTrimmedRight (28.0f);
-            g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::bold));
-            g.setColour (accent.withAlpha (0.25f));
-            g.drawText (getButtonText().toUpperCase(), textArea.translated (0.0f, 0.5f).expanded (0.5f), juce::Justification::centredLeft, true);
-            g.setColour (accent.brighter (0.4f));
-            g.drawText (getButtonText().toUpperCase(), textArea, juce::Justification::centredLeft, true);
-
+            const auto area = getLocalBounds().toFloat();
+            rackui::oled (g, area);
+            rackui::oledText (g, getButtonText().toUpperCase(), area.reduced (10.0f, 0.0f).withTrimmedRight (14.0f), accent, 12.5f);
             juce::Path caret;
-            const auto cx = area.getRight() - 15.0f, cy = area.getCentreY();
-            caret.startNewSubPath (cx - 4.0f, cy - 2.0f);
+            const auto cx = area.getRight() - 12.0f, cy = area.getCentreY();
+            caret.startNewSubPath (cx - 3.5f, cy - 1.5f);
             caret.lineTo (cx, cy + 2.0f);
-            caret.lineTo (cx + 4.0f, cy - 2.0f);
-            g.strokePath (caret, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            caret.lineTo (cx + 3.5f, cy - 1.5f);
+            g.setColour (accent.withAlpha (over ? 0.9f : 0.45f));
+            g.strokePath (caret, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 
     private:
@@ -173,7 +168,7 @@ private:
 
     Processor& proc;
     NameButton nameButton;
-    juce::TextButton previous { "<" }, next { ">" }, save { "SAVE" };
+    rackui::CapButton previous { "<" }, next { ">" }, save { "STORE" };
     std::unique_ptr<juce::AlertWindow> dialog;
 };
 

@@ -37,6 +37,17 @@ public:
 
     std::unique_ptr<Display> createDisplay() override { return std::make_unique<width::View> (*this, module); }
 
+    juce::AudioProcessorEditor* createEditor() override
+    {
+        RackSpec spec;
+        spec.left = { { "width", true, marks ({ { 0, "0" }, { 50, "50" }, { 100, "100" }, { 150, "150" }, { 200, "200" } }), "%" },
+                      { "space", false, pctMarks(), "%" } };
+        spec.right = { { "output", true, dbMarks(), "dB" } };
+        spec.centre = Centre::display;
+        spec.centreWidth = 210;
+        return new RackEditor (*this, std::move (spec));
+    }
+
 private:
     width::Module module;
 };

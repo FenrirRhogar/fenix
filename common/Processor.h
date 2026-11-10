@@ -95,7 +95,7 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
     std::atomic<float> meter { 0.0f };
-    std::atomic<float> inputRms { 0.0f }, inputPeak { 0.0f }, outputRms { 0.0f };
+    std::atomic<float> inputRms { 0.0f }, inputPeak { 0.0f }, outputRms { 0.0f }, outputPeak { 0.0f };
     ScopeFifo scope;
 
     //==============================================================================
@@ -134,6 +134,7 @@ public:
 
         fader.apply (buffer, numChannels, bypass->load() > 0.5f);
         outputRms.store (bufferLevel (buffer, numChannels, false));
+        outputPeak.store (bufferLevel (buffer, numChannels, true));
         scope.push (buffer, numChannels);
     }
 

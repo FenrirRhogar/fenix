@@ -36,6 +36,19 @@ public:
 
     std::unique_ptr<Display> createDisplay() override { return std::make_unique<shelf::View> (*this, module); }
 
+    juce::AudioProcessorEditor* createEditor() override
+    {
+        RackSpec spec;
+        spec.left = { { "lowFreq", false, marks ({ { 0, "30" }, { 1, "60" }, { 2, "90" }, { 3, "120" }, { 4, "200" } }), "Hz" },
+                      { "lowGain", true, dbMarks(), "dB", "LOW" } };
+        spec.right = { { "highGain", true, dbMarks(), "dB", "HIGH" },
+                       { "highFreq", false, marks ({ { 0, "6" }, { 1, "8" }, { 2, "12" }, { 3, "16" }, { 4, "20" } }), "kHz" },
+                       { "output", false, dbMarks(), "dB" } };
+        spec.centre = Centre::display;
+        spec.centreWidth = 300;
+        return new RackEditor (*this, std::move (spec));
+    }
+
 private:
     shelf::Module module;
 };

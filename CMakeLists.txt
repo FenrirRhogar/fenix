@@ -20,11 +20,13 @@ else()
 endif()
 
 # Panel fonts, compiled into every plugin so legends look the same on every platform.
-juce_add_binary_data(FenixFonts
-    HEADER_NAME "FenixFonts.h"
-    NAMESPACE FenixFonts
-    SOURCES common/fonts/NotoSans-Bold.ttf common/fonts/NotoSans-Medium.ttf)
-set_target_properties(FenixFonts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+juce_add_binary_data(RackFonts
+    HEADER_NAME "RackFonts.h"
+    NAMESPACE RackFonts
+    SOURCES common/fonts/BarlowCondensed-SemiBold.ttf common/fonts/BarlowCondensed-Bold.ttf
+            common/fonts/Barlow-Regular.ttf common/fonts/Barlow-Medium.ttf
+            common/fonts/JetBrainsMono-Medium.ttf common/fonts/JetBrainsMono-Bold.ttf)
+set_target_properties(RackFonts PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 function(fenix_plugin target name code)
     juce_add_plugin(${target}
@@ -54,7 +56,7 @@ function(fenix_plugin target name code)
         JUCE_VST3_CAN_REPLACE_VST2=0)
     target_link_libraries(${target}
         PRIVATE juce::juce_audio_utils juce::juce_dsp
-        PUBLIC FenixFonts
+        PUBLIC RackFonts
                juce::juce_recommended_config_flags
                juce::juce_recommended_warning_flags)
     if(FENIX_LTO)

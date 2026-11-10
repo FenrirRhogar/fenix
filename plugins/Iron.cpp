@@ -36,6 +36,16 @@ public:
 
     std::unique_ptr<Display> createDisplay() override { return std::make_unique<iron::View> (*this, module); }
 
+    juce::AudioProcessorEditor* createEditor() override
+    {
+        RackSpec spec;
+        spec.left = { { "amount", true, pctMarks(), "%" } };
+        spec.right = { { "output", true, dbMarks(), "dB" } };
+        spec.centre = Centre::display;
+        spec.centreWidth = 300;
+        return new RackEditor (*this, std::move (spec));
+    }
+
 private:
     iron::Module module;
 };

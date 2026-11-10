@@ -36,6 +36,16 @@ public:
 
     std::unique_ptr<Display> createDisplay() override { return std::make_unique<drive::View> (*this, module); }
 
+    juce::AudioProcessorEditor* createEditor() override
+    {
+        RackSpec spec;
+        spec.left = { { "drive", true, marks ({ { 0, "0" }, { 6, "6" }, { 12, "12" }, { 18, "18" }, { 24, "24" } }), "dB" },
+                      { "density", false, pctMarks(), "%" } };
+        spec.right = { { "mix", false, pctMarks(), "% WET" }, { "output", true, dbMarks(), "dB" } };
+        spec.centre = Centre::vu;
+        return new RackEditor (*this, std::move (spec));
+    }
+
 private:
     drive::Module module;
 };
