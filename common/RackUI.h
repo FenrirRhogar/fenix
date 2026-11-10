@@ -830,6 +830,17 @@ inline void nameplate (juce::Graphics& g, juce::Point<float> at, const juce::Str
     print (g, subtitle, { at.x, at.y + 60.0f, 260.0f, 12.0f }, Face::textMedium, 9.0f, 0.2f, colour::inkDim, juce::Justification::centredLeft);
 }
 
+// Whole-panel scaling: a panel is laid out once at its base size, then every child is scaled by the
+// same factor (the host's resize corner keeps its own place). Background images should be rendered
+// at the scaled size with the same transform, so nothing is blurred.
+inline void scaleChildren (juce::Component& parent, float scale, const juce::Component* except = nullptr)
+{
+    const auto transform = juce::AffineTransform::scale (scale);
+    for (auto* child : parent.getChildren())
+        if (child != except)
+            child->setTransform (transform);
+}
+
 // A rune drawn as round-capped strokes in a 20x20 box: each stroke is { x1, y1, x2, y2 }.
 inline juce::Path rune (std::initializer_list<std::array<float, 4>> strokes, float thickness = 2.5f)
 {
