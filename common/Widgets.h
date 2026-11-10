@@ -443,7 +443,7 @@ private:
                     juce::Justification::centred);
         g.setFont (juce::FontOptions (7.5f, juce::Font::bold).withKerningFactor (0.3f));
         g.setColour (ink.withAlpha (0.5f));
-        g.drawText ("FENRIKOS", juce::Rectangle<float> (80.0f, 10.0f).withCentre ({ face.getCentreX(), face.getY() + 14.0f }), juce::Justification::centred);
+        g.drawText ("fenrikos", juce::Rectangle<float> (80.0f, 10.0f).withCentre ({ face.getCentreX(), face.getY() + 14.0f }), juce::Justification::centred);
     }
 
     // Pivot cover, the window's inner shadow and a glass reflection: these sit over the needle.

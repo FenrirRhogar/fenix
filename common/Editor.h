@@ -66,8 +66,8 @@ public:
         rackui::plate (g, all.reduced ((float) ear, 0.0f));
         rackui::ears (g, all);
         rackui::nameplate (g, { (float) ear + 30.0f, 26.0f }, "FENIX", proc.getName().fromFirstOccurrenceOf ("Fenix ", false, false).toUpperCase(),
-                           proc.tagline().toUpperCase(), fehuMark(), juce::Colour (0xfff08a3e));
-        rackui::print (g, "FENRIKOS", { (float) ear + 30.0f, (float) getHeight() - 20.0f, 200.0f, 14.0f }, rackui::Face::textMedium, 8.0f, 0.3f,
+                           proc.tagline().toUpperCase(), fehuMark(), rackui::colour::ink);
+        rackui::print (g, "fenrikos", { (float) ear + 30.0f, (float) getHeight() - 20.0f, 200.0f, 14.0f }, rackui::Face::textMedium, 8.0f, 0.3f,
                        rackui::colour::inkFaint, juce::Justification::centredLeft);
         paintPanel (g);
     }
