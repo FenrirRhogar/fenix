@@ -71,6 +71,18 @@ fenix_plugin(Width     "Width"     FxWd)  # M/S width + low-band spread
 fenix_plugin(Iron      "Iron"      FxIr)  # output transformer colour
 fenix_plugin(Bus       "Bus"       FxBs)  # all five stages in one chain
 
+# Optional: one <Plugin>_tests executable per plugin (host blocks larger than announced).
+# Build with -fsanitize=address to catch bad memory accesses.
+option(FENIX_TESTS "Build the block-size tests" OFF)
+if(FENIX_TESTS)
+    foreach(plugin Drive Shelf HFComp Width Iron Bus)
+        add_executable(${plugin}_tests tests/BlockSizeTests.cpp)
+        target_include_directories(${plugin}_tests PRIVATE $<TARGET_PROPERTY:${plugin},INCLUDE_DIRECTORIES>)
+        target_compile_definitions(${plugin}_tests PRIVATE $<TARGET_PROPERTY:${plugin},COMPILE_DEFINITIONS>)
+        target_link_libraries(${plugin}_tests PRIVATE ${plugin})
+    endforeach()
+endif()
+
 # Optional: one <Plugin>_snapshot executable per plugin that renders its editor to PNG.
 option(FENIX_SNAPSHOTS "Build editor snapshot tools" OFF)
 if(FENIX_SNAPSHOTS)

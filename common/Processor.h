@@ -101,6 +101,7 @@ public:
     //==============================================================================
     void prepareToPlay (double sampleRate, int maxBlockSize) override
     {
+        maxBlock = maxBlockSize;
         prepare (sampleRate, maxBlockSize);
 
         fader.prepare (sampleRate, maxBlockSize, getTotalNumInputChannels(), getLatencySamples(), bypass->load() > 0.5f);
@@ -121,6 +122,29 @@ public:
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
     {
         juce::ScopedNoDenormals noDenormals;
+
+        // A host may send more samples than it promised in prepareToPlay. Work through them in pieces
+        // no larger than that, so no buffer sized from the announced block has to grow (or overrun)
+        // on the audio thread.
+        const int total = buffer.getNumSamples();
+        const int limit = maxBlock > 0 ? maxBlock : total;
+        if (total <= limit)
+        {
+            processChunk (buffer);
+            return;
+        }
+
+        for (int start = 0; start < total; start += limit)
+        {
+            juce::AudioBuffer<float> piece (buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                                            start, juce::jmin (limit, total - start));
+            processChunk (piece);
+        }
+    }
+
+    // One host block, no larger than the announced size.
+    void processChunk (juce::AudioBuffer<float>& buffer)
+    {
         const int numChannels = getTotalNumInputChannels();
         const int numSamples = buffer.getNumSamples();
         for (auto ch = numChannels; ch < getTotalNumOutputChannels(); ++ch)
@@ -275,7 +299,8 @@ private:
     }
 
     std::atomic<float>* bypass = nullptr;
-    int currentProgram = 0;
+    std::atomic<int> currentProgram { 0 };   // hosts read it from their own threads
+    int maxBlock = 0;
     BypassFader fader;
 };
 
