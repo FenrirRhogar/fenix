@@ -1,5 +1,20 @@
 FENIX COLOUR SUITE  -  CHANGELOG
 
+2.0.0
+- New look for all six: a graphite rack panel with ears, cream silkscreen, machined knobs printed
+  with real units, an OLED preset window and a calibrated VU meter. Every unit is the same width.
+- Window size: a SIZE switch (S / M / L = 80 / 100 / 125 %) replaces dragging the corner.
+- The level meters are calibrated VUs: click CAL to choose which input level reads 0 VU. They no
+  longer sit at +3.
+- The preset name shows an asterisk (for example WARM IRON*) when a knob has moved away from the
+  stored preset, and loses it when you put the knob back or store the preset.
+- Fixed: a host that sends audio in larger blocks than it announced is now handled by working
+  through the block in pieces. The units behave the same at any block size.
+- The mouse pointer is always a plain arrow over the window (some Linux desktops showed a
+  resize cursor).
+- New test: every unit gives the same audio for the same input whether the host sends small or
+  large blocks.
+
 1.0.1
 - Update notice: the footer shows "UPDATE x.y.z AVAILABLE" when a newer version is out. Click it for
   the download page, or to switch the check off. It asks GitHub at most once a day and sends nothing
