@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "RackUI.h"
 
 namespace fenix
 {
@@ -258,6 +259,17 @@ class LookAndFeel : public juce::LookAndFeel_V4
 public:
     juce::Colour accent { juce::Colours::orange };
 
+    // Plain arrow wherever a component asks for the default cursor (see rackui::arrowCursor).
+    juce::MouseCursor getMouseCursorFor (juce::Component& c) override
+    {
+        const auto cursor = juce::LookAndFeel_V4::getMouseCursorFor (c);
+        return cursor == juce::MouseCursor::NormalCursor || cursor == juce::MouseCursor::ParentCursor ? arrow : cursor;
+    }
+
+private:
+    juce::MouseCursor arrow { rackui::arrowCursor() };
+
+public:
     LookAndFeel()
     {
         setColour (juce::PopupMenu::backgroundColourId, juce::Colour (0xff1b1e23));

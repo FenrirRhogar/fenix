@@ -167,6 +167,30 @@ inline void glass (juce::Graphics& g, juce::Rectangle<float> w, float strength =
     g.fillPath (sheen);
 }
 
+// An explicit arrow. JUCE's "normal" cursor means "whatever the parent window shows" on X11, so inside a
+// host window the pointer can keep the host's resize cursor from the window edge. Setting this on the
+// editor makes the plugin's own area always show a plain arrow.
+inline juce::MouseCursor arrowCursor()
+{
+    constexpr int size = 32;
+    juce::Image image (juce::Image::ARGB, size, size, true);
+    juce::Graphics g (image);
+    juce::Path arrow;
+    arrow.startNewSubPath (2.5f, 2.0f);
+    arrow.lineTo (2.5f, 23.0f);
+    arrow.lineTo (8.0f, 18.0f);
+    arrow.lineTo (12.0f, 27.0f);
+    arrow.lineTo (16.0f, 25.0f);
+    arrow.lineTo (12.0f, 17.0f);
+    arrow.lineTo (19.5f, 17.0f);
+    arrow.closeSubPath();
+    g.setColour (juce::Colours::white);
+    g.fillPath (arrow);
+    g.setColour (juce::Colours::black);
+    g.strokePath (arrow, juce::PathStrokeType (1.5f, juce::PathStrokeType::mitered));
+    return juce::MouseCursor (image, 2, 2);
+}
+
 // Recessed OLED window.
 inline void oled (juce::Graphics& g, juce::Rectangle<float> r)
 {
