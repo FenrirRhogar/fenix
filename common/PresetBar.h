@@ -27,7 +27,7 @@ public:
     // Cheap enough to call every frame: only repaints when the name actually changes.
     void refresh()
     {
-        const auto name = proc.presetName();
+        const auto name = proc.presetName() + (proc.isPresetModified() ? "*" : "");
         if (name != nameButton.getButtonText())
             nameButton.setButtonText (name);
     }

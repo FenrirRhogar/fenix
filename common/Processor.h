@@ -81,6 +81,7 @@ public:
           apvts (*this, nullptr, "PARAMS", withBypass (std::move (layout)))
     {
         bypass = apvts.getRawParameterValue ("bypass");
+        markPresetClean();
     }
 
     virtual void prepare (double sampleRate, int maxBlockSize) = 0;
@@ -201,6 +202,7 @@ public:
 
         currentProgram = index;
         setPresetName (factoryPresets[(size_t) index].name);
+        markPresetClean();
     }
 
     juce::File userPresetDirectory() const
@@ -229,6 +231,7 @@ public:
             return false;
 
         setPresetName (name);
+        markPresetClean();
         return true;
     }
 
@@ -247,10 +250,22 @@ public:
         });
 
         setPresetName (file.getFileNameWithoutExtension());
+        markPresetClean();
         return true;
     }
 
     juce::String presetName() const { return apvts.state.getProperty ("presetName", "Default"); }
+
+    // True when any knob or switch differs from how the preset was loaded or stored (moving a
+    // knob back puts it right again). The editor shows an asterisk after the name.
+    bool isPresetModified() const
+    {
+        const juce::ScopedLock lock (cleanLock);
+        for (const auto& [parameter, value] : cleanValues)
+            if (std::abs (parameter->getValue() - value) > 1.0e-5f)
+                return true;
+        return false;
+    }
 
     inline static const juce::String presetExtension { ".fenixpreset" };
 
@@ -272,9 +287,23 @@ public:
             if (auto* toggle = dynamic_cast<juce::AudioParameterBool*> (raw))
                 if (const auto exact = toggle->get() ? 1.0f : 0.0f; std::abs (raw->getValue() - exact) > 1.0e-6f)
                     toggle->setValueNotifyingHost (exact);
+
+        markPresetClean();
     }
 
 private:
+    // Remembers the current values as "the preset as stored". Not for the audio thread.
+    void markPresetClean()
+    {
+        std::vector<std::pair<juce::RangedAudioParameter*, float>> values;
+        forEachPresetParameter ([&values] (juce::RangedAudioParameter& p) { values.emplace_back (&p, p.getValue()); });
+        const juce::ScopedLock lock (cleanLock);
+        cleanValues = std::move (values);
+    }
+
+    mutable juce::CriticalSection cleanLock;
+    std::vector<std::pair<juce::RangedAudioParameter*, float>> cleanValues;
+
     template <typename Fn>
     void forEachPresetParameter (Fn&& fn)
     {
